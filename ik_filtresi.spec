@@ -76,8 +76,10 @@ pyz = PYZ(
 exe = EXE(
     pyz,
     a.scripts,
-    [],
-    exclude_binaries=True,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    exclude_binaries=False,
     name='IK_Filtresi',
     debug=False,
     bootloader_ignore_signals=False,
@@ -91,13 +93,4 @@ exe = EXE(
     entitlements_file=None,
 )
 
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=True,
-    upx_exclude=[],
-    name='IK_Filtresi',
-)
+# One-file build: binaries, zipfiles and datas are embedded in the single executable
