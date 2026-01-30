@@ -40,7 +40,7 @@ class SingleFilterWidget(QFrame):
         self._column_combo.setMinimumWidth(150)
         self._column_combo.addItem("Sütun Seçin...", None)
         for info in self._column_infos:
-            self._column_combo.addItem(info.name, info)
+            self._column_combo.addItem(str(info.name), info)
         self._column_combo.currentIndexChanged.connect(self._on_column_changed)
         self._main_layout.addWidget(self._column_combo)
         
