@@ -42,12 +42,24 @@ class NumericInput(FilterValueInput):
         if is_range:
             self.layout.addWidget(QLabel("-"))
             self.spin2 = self._create_spinbox(min_val, max_val)
+            # Keep range consistent: start <= end
+            self.spin1.valueChanged.connect(lambda v: self.spin2.setMinimum(v))
+            self.spin2.valueChanged.connect(lambda v: self.spin1.setMaximum(v))
             self.layout.addWidget(self.spin2)
 
     def _create_spinbox(self, min_val, max_val):
         spin = QDoubleSpinBox()
-        spin.setRange(-999999999, 999999999)
         spin.setDecimals(2)
+        # Constrain to column min/max if available
+        if min_val is not None and max_val is not None:
+            spin.setRange(float(min_val), float(max_val))
+        elif min_val is not None:
+            spin.setMinimum(float(min_val))
+        elif max_val is not None:
+            spin.setMaximum(float(max_val))
+        else:
+            spin.setRange(-999999999, 999999999)
+        # Set initial value
         if min_val is not None:
             spin.setValue(float(min_val))
         spin.valueChanged.connect(self.changed.emit)
@@ -63,21 +75,32 @@ class DateInput(FilterValueInput):
     def __init__(self, is_range: bool, min_val=None, max_val=None, parent=None):
         super().__init__(parent)
         self.is_range = is_range
-        
-        self.date1 = self._create_date_edit(min_val)
+
+        self.date1 = self._create_date_edit(default_val=min_val, min_val=min_val, max_val=max_val)
         self.layout.addWidget(self.date1)
-        
+
         if is_range:
             self.layout.addWidget(QLabel("-"))
-            self.date2 = self._create_date_edit(max_val)
+            self.date2 = self._create_date_edit(default_val=max_val, min_val=min_val, max_val=max_val)
+            # Ensure start <= end
+            self.date1.dateChanged.connect(lambda qd: self.date2.setMinimumDate(qd))
+            self.date2.dateChanged.connect(lambda qd: self.date1.setMaximumDate(qd))
             self.layout.addWidget(self.date2)
 
-    def _create_date_edit(self, val):
+    def _create_date_edit(self, default_val=None, min_val=None, max_val=None):
         edit = QDateEdit()
         edit.setCalendarPopup(True)
         edit.setDisplayFormat("dd.MM.yyyy")
-        if val and isinstance(val, datetime):
-            edit.setDate(QDate(val.year, val.month, val.day))
+        # set allowed range
+        if isinstance(min_val, datetime):
+            edit.setMinimumDate(QDate(min_val.year, min_val.month, min_val.day))
+        if isinstance(max_val, datetime):
+            edit.setMaximumDate(QDate(max_val.year, max_val.month, max_val.day))
+        # initial date preference: default -> min -> current
+        if default_val and isinstance(default_val, datetime):
+            edit.setDate(QDate(default_val.year, default_val.month, default_val.day))
+        elif isinstance(min_val, datetime):
+            edit.setDate(QDate(min_val.year, min_val.month, min_val.day))
         else:
             edit.setDate(QDate.currentDate())
         edit.dateChanged.connect(self.changed.emit)
