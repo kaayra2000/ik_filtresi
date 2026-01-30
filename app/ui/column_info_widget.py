@@ -73,7 +73,6 @@ class ColumnInfoCard(QFrame):
                 values_layout.addWidget(QLabel("Değerler:"))
                 
                 combo = QComboBox()
-                combo.setEnabled(False)  # Sadece görüntüleme amaçlı
                 combo.addItems([str(v) for v in self.column_info.unique_values])
                 combo.setMaximumWidth(200)
                 values_layout.addWidget(combo)
