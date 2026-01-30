@@ -2,9 +2,10 @@ name: Build on Multiple Platforms
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    tags:
+      - '*'
+  release:
+    types: [published]
 
 jobs:
   build-ubuntu:
