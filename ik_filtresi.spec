@@ -23,34 +23,15 @@ if icons_dir.exists():
             dest = str(p.parent.relative_to(project_root))
             datas.append((str(p), dest))
 
-# Gizli importlar (PyQt6 ve pandas için gerekli)
+# Gizli importlar: yalnızca PyQt6, pandas ve Excel motorları
+# PyInstaller kendi hook'larıyla çoğu alt-modülü çözer; burada yalnızca
+# tespit edilemeyen temel paketleri bırakıyoruz.
 hiddenimports = [
     'PyQt6',
-    'PyQt6.QtCore',
-    'PyQt6.QtGui',
-    'PyQt6.QtWidgets',
     'pandas',
-    'pandas._libs',
-    'pandas._libs.tslibs',
-    'pandas._libs.tslibs.timedeltas',
-    'pandas._libs.tslibs.nattype',
-    'pandas._libs.tslibs.np_datetime',
     'numpy',
     'openpyxl',
     'xlrd',
-    'app',
-    'app.models',
-    'app.models.column_info',
-    'app.models.filter_model',
-    'app.services',
-    'app.services.file_reader',
-    'app.services.data_analyzer',
-    'app.services.filter_engine',
-    'app.ui',
-    'app.ui.main_window',
-    'app.ui.column_info_widget',
-    'app.ui.filter_widget',
-    'app.ui.data_table_widget',
 ]
 
 a = Analysis(

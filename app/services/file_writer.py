@@ -85,8 +85,8 @@ class FileWriterFactory:
     
     def __init__(self):
         self._strategies: list[FileWriterStrategy] = [
-            CSVWriter(),
-            ExcelWriter()
+            ExcelWriter(),
+            CSVWriter()
         ]
     
     def register_strategy(self, strategy: FileWriterStrategy) -> None:
