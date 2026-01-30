@@ -105,7 +105,8 @@ class DataTableWidget(QWidget):
         header_layout.addStretch()
         
         self._stats_label = QLabel()
-        self._stats_label.setStyleSheet("color: #7f8c8d;")
+        # use muted property to apply shared style from style.qss
+        self._stats_label.setProperty("muted", True)
         header_layout.addWidget(self._stats_label)
         
         layout.addLayout(header_layout)
@@ -128,6 +129,13 @@ class DataTableWidget(QWidget):
         export_layout.addStretch()
         
         self._format_combo = QComboBox()
+        # Label for the format combo (placed to the left)
+        self._format_label = QLabel("Kaydetme türü:")
+        # apply shared muted label style via property
+        self._format_label.setProperty("muted", True)
+        self._format_label.setContentsMargins(0, 0, 6, 0)
+        export_layout.addWidget(self._format_label)
+
         # Populate formats dynamically from FileWriterFactory
         writer_factory = FileWriterFactory()
         for desc in writer_factory.get_format_descriptors():

@@ -26,6 +26,11 @@ QLabel#fileLabel {
     color: #7f8c8d;
 }
 
+/* Muted labels: use by setting property muted=true on QLabel */
+QLabel[muted="true"] {
+    color: #7f8c8d;
+}
+
 QLabel#sectionLabel {
     font-size: 14pt;
     font-weight: bold;

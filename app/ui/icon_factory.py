@@ -3,7 +3,7 @@ from typing import Optional
 
 from PyQt6.QtGui import QIcon
 from PyQt6.QtCore import QSize, Qt
-from PyQt6.QtWidgets import QToolButton
+from PyQt6.QtWidgets import QToolButton, QSizePolicy
 
 
 class IconFactory:
@@ -95,10 +95,15 @@ class IconFactory:
         button = QToolButton()
         button.setText(text)
         button.setMinimumWidth(min_width)
-        
-        # Sola yaslama ayarları
-        button.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
-        
-        IconFactory.apply_icon(button, name, size, text_beside_icon=False)
-        
+
+        # Apply icon and ensure text is beside icon
+        IconFactory.apply_icon(button, name, size, text_beside_icon=True)
+
+        # Centralize size policy and baseline styling for all icon buttons
+        try:
+            button.setSizePolicy(QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed))
+            # Size policy centralized; visual alignment moved to style.qss
+        except Exception:
+            pass
+
         return button
