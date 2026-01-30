@@ -112,6 +112,12 @@ class SingleFilterWidget(QFrame):
             if item.widget():
                 item.widget().deleteLater()
         
+        # Eski widget referanslarını temizle
+        for attr in ['_value1_spin', '_value2_spin', '_value1_date', '_value2_date', 
+                     '_value_combo', '_list_checkboxes', '_value_edit']:
+            if hasattr(self, attr):
+                delattr(self, attr)
+        
         if self._current_column_info is None:
             return
         

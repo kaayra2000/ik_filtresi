@@ -11,6 +11,7 @@ from typing import Optional
 from pathlib import Path
 
 import pandas as pd
+from app.services.file_writer import FileWriterFactory
 
 
 class PandasTableModel(QAbstractTableModel):
@@ -200,10 +201,8 @@ class DataTableWidget(QWidget):
             file_path += default_suffix
         
         try:
-            if format == 'csv':
-                self._filtered_df.to_csv(file_path, index=False, encoding='utf-8-sig')
-            else:
-                self._filtered_df.to_excel(file_path, index=False, engine='openpyxl')
+            writer_factory = FileWriterFactory()
+            writer_factory.write_file(self._filtered_df, Path(file_path))
             
             QMessageBox.information(
                 self,
