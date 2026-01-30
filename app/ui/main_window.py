@@ -2,9 +2,8 @@
 Ana pencere - Uygulamanın ana arayüzü
 """
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QFileDialog, QMessageBox, QSplitter, QStatusBar,
-    QGroupBox, QProgressBar
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFileDialog,
+    QMessageBox, QSplitter, QStatusBar, QGroupBox, QProgressBar
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QAction
@@ -104,12 +103,8 @@ class MainWindow(QMainWindow):
         header_layout.addStretch()
         
         self._file_label = QLabel("Dosya seçilmedi")
-        self._file_label.setStyleSheet("color: #7f8c8d;")
+        self._file_label.setObjectName("fileLabel")
         header_layout.addWidget(self._file_label)
-        
-        self._load_btn = QPushButton("📂 Dosya Yükle")
-        self._load_btn.clicked.connect(self._prompt_file_selection)
-        header_layout.addWidget(self._load_btn)
         
         main_layout.addLayout(header_layout)
         
@@ -156,8 +151,9 @@ class MainWindow(QMainWindow):
         
         splitter.addWidget(right_panel)
         
-        # Splitter oranları
-        splitter.setSizes([400, 800])
+        # Splitter oranları — veri önizlemeyi biraz daha küçük yapıp sol paneli büyütüyoruz
+        # (soldan, sağdan) örn: sol 430, sağ 770
+        splitter.setSizes([430, 770])
         
         main_layout.addWidget(splitter)
         
@@ -243,7 +239,6 @@ class MainWindow(QMainWindow):
         # Progress göster
         self._progress_bar.setVisible(True)
         self._status_bar.showMessage("Dosya yükleniyor...")
-        self._load_btn.setEnabled(False)
         
         # Thread ile yükle
         self._loader_thread = FileLoaderThread(file_path)
@@ -259,7 +254,6 @@ class MainWindow(QMainWindow):
     def _on_file_loaded(self, df: pd.DataFrame, column_infos: List[ColumnInfo]):
         """Dosya yüklendiğinde"""
         self._progress_bar.setVisible(False)
-        self._load_btn.setEnabled(True)
         
         self._df = df
         self._column_infos = column_infos
@@ -287,7 +281,6 @@ class MainWindow(QMainWindow):
     def _on_load_error(self, error_message: str):
         """Yükleme hatası"""
         self._progress_bar.setVisible(False)
-        self._load_btn.setEnabled(True)
         
         QMessageBox.critical(
             self,

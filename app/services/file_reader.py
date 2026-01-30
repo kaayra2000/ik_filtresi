@@ -64,8 +64,7 @@ class CSVReader(FileReaderStrategy):
             file_path,
             delimiter=delimiter,
             encoding=encoding,
-            parse_dates=True,
-            infer_datetime_format=True
+            parse_dates=True
         )
     
     def _detect_delimiter(self, file_path: Path) -> str:

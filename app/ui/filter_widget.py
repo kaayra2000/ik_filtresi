@@ -2,17 +2,21 @@
 Filtre widget'ı - Filtreleme arayüzü
 """
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QToolButton,
     QComboBox, QLineEdit, QFrame, QScrollArea, QDateEdit,
     QDoubleSpinBox, QMessageBox, QCheckBox
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QDate
-from PyQt6.QtGui import QDoubleValidator
+from PyQt6.QtWidgets import QFileDialog, QGridLayout
+from PyQt6.QtCore import pyqtSignal, QDate, QSize
+from PyQt6.QtGui import QIcon, QPixmap
+from pathlib import Path
+from app.ui.icon_factory import IconFactory
 from typing import List, Optional, Any
 from datetime import datetime
 
 from app.models.column_info import ColumnInfo, ColumnType
 from app.models.filter_model import FilterModel, FilterOperator
+from app.services.filter_persistence import FilterPersistence
 
 
 class FilterValueInput(QWidget):
@@ -219,8 +223,8 @@ class SingleFilterWidget(QFrame):
         # Stretch
         self._main_layout.addStretch()
         
-        # Kaldır butonu
-        remove_btn = QPushButton("✕")
+        # Kaldır butonu (küçük toolbutton) - ikon kullan
+        remove_btn = IconFactory.create_tool_button("remove.svg")
         remove_btn.setObjectName("removeButton")
         remove_btn.setFixedSize(30, 30)
         remove_btn.clicked.connect(lambda: self.removed.emit(self))
@@ -445,7 +449,7 @@ class FilterWidget(QWidget):
         
         header_layout.addStretch()
         
-        self._add_btn = QPushButton("+ Filtre Ekle")
+        self._add_btn = IconFactory.create_tool_button("add_filter.svg", "Filtre Ekle")
         self._add_btn.setObjectName("addFilterButton")
         self._add_btn.setEnabled(False)
         self._add_btn.clicked.connect(self._add_filter)
@@ -466,26 +470,47 @@ class FilterWidget(QWidget):
         scroll.setWidget(self._filters_container)
         main_layout.addWidget(scroll)
         
-        # Filtreleri uygula butonu
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        
-        self._clear_btn = QPushButton("Temizle")
+        # Filtreleri uygula butonu (buttons wrapped in a container for targeted styling)
+        lower_button_container = QWidget()
+        lower_button_layout = QGridLayout(lower_button_container)
+        lower_button_layout.setContentsMargins(0, 0, 0, 0)
+        lower_button_layout.setHorizontalSpacing(8)
+        lower_button_layout.setVerticalSpacing(6)
+
+        # Save / Load buttons moved here to avoid header overflow
+        self._save_btn = IconFactory.create_tool_button("save_filters.svg", "Filtreleri Kaydet")
+        self._save_btn.setObjectName("saveFilterButton")
+        self._save_btn.setEnabled(False)
+        self._save_btn.clicked.connect(self._save_filters_to_file)
+        # Arrange buttons in 2x2 grid: (0,0) save, (0,1) load, (1,0) clear, (1,1) apply
+        lower_button_layout.addWidget(self._save_btn, 0, 0)
+
+        self._load_btn = IconFactory.create_tool_button("load_from_file.svg", "Dosyadan Yükle")
+        self._load_btn.setObjectName("loadFilterButton")
+        self._load_btn.setEnabled(True)
+        self._load_btn.clicked.connect(self._load_filters_from_file)
+        lower_button_layout.addWidget(self._load_btn, 0, 1)
+
+        self._clear_btn = IconFactory.create_tool_button("clear.svg", "Temizle")
         self._clear_btn.setObjectName("dangerButton")
         self._clear_btn.clicked.connect(self._clear_filters)
-        btn_layout.addWidget(self._clear_btn)
-        
-        self._apply_btn = QPushButton("Filtreleri Uygula")
+        lower_button_layout.addWidget(self._clear_btn, 1, 0)
+
+        self._apply_btn = IconFactory.create_tool_button("apply_filters.svg", "Filtreleri Uygula")
         self._apply_btn.setObjectName("primaryButton")
         self._apply_btn.clicked.connect(self._apply_filters)
-        btn_layout.addWidget(self._apply_btn)
-        
-        main_layout.addLayout(btn_layout)
+        lower_button_layout.addWidget(self._apply_btn, 1, 1)
+        main_layout.addWidget(lower_button_container)
     
     def set_column_infos(self, column_infos: List[ColumnInfo]):
         """Sütun bilgilerini günceller"""
         self._column_infos = column_infos
         self._add_btn.setEnabled(len(column_infos) > 0)
+        # enable save when we have column info (so saved filters can be validated on load)
+        try:
+            self._save_btn.setEnabled(len(column_infos) > 0)
+        except Exception:
+            pass
         self._clear_filters()
     
     def _add_filter(self):
@@ -550,3 +575,57 @@ class FilterWidget(QWidget):
             if filter_model is not None:
                 filters.append(filter_model)
         return filters
+
+    def _save_filters_to_file(self):
+        """Save current filters to a user-selected JSON file."""
+        if not self._column_infos:
+            QMessageBox.warning(self, "Kaydetme Hatası", "Önce sütun bilgileri yüklenmeli.")
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Filtreleri Kaydet", filter="JSON dosyaları (*.json);;Tüm dosyalar (*)")
+        if not path:
+            return
+        try:
+            persistence = FilterPersistence(path=path)
+            persistence.save_filters(self.get_filters())
+            QMessageBox.information(self, "Kaydedildi", f"Filtreler kaydedildi: {path}")
+        except Exception as e:
+            QMessageBox.critical(self, "Kaydetme Hatası", f"Filtre kaydedilirken hata oluştu:\n{e}")
+
+    def _load_filters_from_file(self):
+        """Load filters from a JSON file. If incompatible, warn the user and ask to continue."""
+        path, _ = QFileDialog.getOpenFileName(self, "Filtre Dosyası Seçin", filter="JSON dosyaları (*.json);;Tüm dosyalar (*)")
+        if not path:
+            return
+        try:
+            persistence = FilterPersistence(path=path)
+            loaded = persistence.load_filters()
+        except Exception as e:
+            QMessageBox.critical(self, "Yükleme Hatası", f"Dosya yüklenirken hata oluştu:\n{e}")
+            return
+
+        if not loaded:
+            QMessageBox.warning(self, "Yükleme", "Dosyada geçerli filtre bulunamadı veya okunamadı.")
+            return
+
+        # Check compatibility with current columns
+        compatible = True
+        try:
+            compatible = persistence.is_compatible(loaded, self._column_infos)
+        except Exception:
+            compatible = False
+
+        if not compatible:
+            resp = QMessageBox.question(
+                self,
+                "Uyumsuz Filtreler",
+                "Yüklenen filtreler mevcut sütunlarla veya tiplerle uyumlu değil. Yüklemeye devam edilsin mi?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if resp != QMessageBox.StandardButton.Yes:
+                return
+
+        # Apply (even if incompatible when user forced it)
+        try:
+            self.set_filters(loaded)
+        except Exception as e:
+            QMessageBox.critical(self, "Uygulama Hatası", f"Filtreler uygulanırken hata oluştu:\n{e}")

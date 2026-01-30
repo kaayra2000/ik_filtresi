@@ -37,7 +37,7 @@ class CSVWriter(FileWriterStrategy):
     
     @property
     def supported_extensions(self) -> list[str]:
-        return ['.csv', '.txt']
+        return ['.csv']
     
     def can_write(self, file_path: Path) -> bool:
         return file_path.suffix.lower() in self.supported_extensions
@@ -85,8 +85,8 @@ class FileWriterFactory:
     
     def __init__(self):
         self._strategies: list[FileWriterStrategy] = [
-            CSVWriter(),
-            ExcelWriter()
+            ExcelWriter(),
+            CSVWriter()
         ]
     
     def register_strategy(self, strategy: FileWriterStrategy) -> None:
@@ -113,3 +113,33 @@ class FileWriterFactory:
         for strategy in self._strategies:
             extensions.extend(strategy.supported_extensions)
         return extensions
+
+    def get_format_descriptors(self) -> list[dict]:
+        """Her strateji için UI'da kullanılabilecek gösterim bilgilerini döndürür.
+
+        Dönen öğe sözlükleri şu anahtarları içerir:
+        - name: Kullanıcıya gösterilecek metin
+        - filter: QFileDialog için filtre metni
+        - default: Önerilen dosya uzantısı (örn. '.csv')
+        """
+        descriptors: list[dict] = []
+        for strategy in self._strategies:
+            exts = [e.lower() for e in strategy.supported_extensions]
+            if not exts:
+                continue
+
+            # Genel, genişletilebilir gösterim oluştur
+            # Örnek: "WriterName (*.ext1;*.ext2)" ve QFileDialog filtresi olarak "*.ext1;*.ext2"
+            patterns = ';'.join(f'*{e}' for e in exts)
+            # Kullanıcıya gösterilecek isimde strateji sınıf adını ve uzantıları listeliyoruz
+            name = f"{', '.join(exts)}"
+            file_filter = f"{strategy.__class__.__name__} ({patterns})"
+            default = exts[0]
+
+            descriptors.append({
+                'name': name,
+                'filter': file_filter,
+                'default': default,
+            })
+
+        return descriptors

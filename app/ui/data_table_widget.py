@@ -3,12 +3,14 @@ Veri tablosu widget'ı - DataFrame'i görüntüler
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTableView, QLabel, QHBoxLayout,
-    QPushButton, QFileDialog, QHeaderView, QMessageBox
+    QWidget, QVBoxLayout, QTableView, QLabel, QHBoxLayout,
+    QToolButton, QFileDialog, QHeaderView, QMessageBox, QComboBox
 )
-from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, QVariant
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, QVariant, QSize
+from PyQt6.QtGui import QColor, QIcon, QPixmap
 from typing import Optional
 from pathlib import Path
+from app.ui.icon_factory import IconFactory
 
 import pandas as pd
 from app.services.file_writer import FileWriterFactory
@@ -103,7 +105,8 @@ class DataTableWidget(QWidget):
         header_layout.addStretch()
         
         self._stats_label = QLabel()
-        self._stats_label.setStyleSheet("color: #7f8c8d;")
+        # use muted property to apply shared style from style.qss
+        self._stats_label.setProperty("muted", True)
         header_layout.addWidget(self._stats_label)
         
         layout.addLayout(header_layout)
@@ -125,15 +128,30 @@ class DataTableWidget(QWidget):
         export_layout = QHBoxLayout()
         export_layout.addStretch()
         
-        self._export_csv_btn = QPushButton("CSV Olarak Kaydet")
-        self._export_csv_btn.clicked.connect(lambda: self._export_data('csv'))
-        self._export_csv_btn.setEnabled(False)
-        export_layout.addWidget(self._export_csv_btn)
+        self._format_combo = QComboBox()
+        # Label for the format combo (placed to the left)
+        self._format_label = QLabel("Kaydetme türü:")
+        # apply shared muted label style via property
+        self._format_label.setProperty("muted", True)
+        self._format_label.setContentsMargins(0, 0, 6, 0)
+        export_layout.addWidget(self._format_label)
+
+        # Populate formats dynamically from FileWriterFactory
+        writer_factory = FileWriterFactory()
+        for desc in writer_factory.get_format_descriptors():
+            idx = self._format_combo.count()
+            self._format_combo.addItem(desc['name'])
+            # store descriptor dict on the item for later use
+            self._format_combo.setItemData(idx, desc, Qt.ItemDataRole.UserRole)
+
+        self._format_combo.setEnabled(False)
+        export_layout.addWidget(self._format_combo)
         
-        self._export_excel_btn = QPushButton("Excel Olarak Kaydet")
-        self._export_excel_btn.clicked.connect(lambda: self._export_data('xlsx'))
-        self._export_excel_btn.setEnabled(False)
-        export_layout.addWidget(self._export_excel_btn)
+        # use a left-aligned tool button with icon
+        self._save_btn = IconFactory.create_tool_button("save.svg", "Kaydet")
+        self._save_btn.clicked.connect(self._on_save_clicked)
+        self._save_btn.setEnabled(False)
+        export_layout.addWidget(self._save_btn)
         
         layout.addLayout(export_layout)
     
@@ -143,8 +161,8 @@ class DataTableWidget(QWidget):
         self._filtered_df = df
         self._model.set_dataframe(df)
         self._update_stats()
-        self._export_csv_btn.setEnabled(True)
-        self._export_excel_btn.setEnabled(True)
+        self._format_combo.setEnabled(True)
+        self._save_btn.setEnabled(True)
     
     def set_filtered_dataframe(self, df: pd.DataFrame):
         """Filtrelenmiş DataFrame'i ayarlar"""
@@ -173,19 +191,25 @@ class DataTableWidget(QWidget):
         else:
             self._stats_label.setText(f"Gösterilen: {filtered} / {total} kayıt")
     
-    def _export_data(self, format: str):
+    def _on_save_clicked(self):
+        """Kaydet butonuna tıklandığında"""
+        idx = self._format_combo.currentIndex()
+        if idx < 0:
+            return
+
+        desc = self._format_combo.itemData(idx, Qt.ItemDataRole.UserRole)
+        if not desc:
+            return
+
+        file_filter = desc.get('filter', '')
+        default_suffix = desc.get('default', '')
+
+        self._export_data_with_filter(file_filter, default_suffix)
+    def _export_data_with_filter(self, file_filter: str, default_suffix: str):
         """Veriyi dosyaya aktarır"""
         if self._filtered_df is None or len(self._filtered_df) == 0:
             QMessageBox.warning(self, "Uyarı", "Dışa aktarılacak veri yok!")
             return
-        
-        if format == 'csv':
-            file_filter = "CSV Dosyaları (*.csv)"
-            default_suffix = ".csv"
-        else:
-            file_filter = "Excel Dosyaları (*.xlsx)"
-            default_suffix = ".xlsx"
-        
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Dosyayı Kaydet",

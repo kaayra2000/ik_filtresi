@@ -56,7 +56,7 @@ class ColumnInfoCard(QFrame):
         stats_text += f"Boş: {self.column_info.null_count} | "
         stats_text += f"Benzersiz: {self.column_info.unique_count}"
         stats_label = QLabel(stats_text)
-        stats_label.setStyleSheet("color: #7f8c8d;")
+        stats_label.setProperty("muted", True)
         layout.addWidget(stats_label)
         
         # Tip'e göre ek bilgiler
@@ -81,7 +81,7 @@ class ColumnInfoCard(QFrame):
                 layout.addLayout(values_layout)
             else:
                 unique_label = QLabel(f"Benzersiz değer sayısı: {self.column_info.unique_count}")
-                unique_label.setStyleSheet("color: #7f8c8d;")
+                unique_label.setProperty("muted", True)
                 layout.addWidget(unique_label)
 
 
