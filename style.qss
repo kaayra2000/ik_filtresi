@@ -11,11 +11,19 @@ QWidget {
 }
 
 /* Başlıklar */
+
+QLabel#titleLabel, QLabel#fileLabel {
+    max-height: 28px;
+}
 QLabel#titleLabel {
     font-size: 18pt;
     font-weight: bold;
     color: #2c3e50;
     padding: 10px;
+}
+
+QLabel#fileLabel {
+    color: #7f8c8d;
 }
 
 QLabel#sectionLabel {
