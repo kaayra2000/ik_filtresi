@@ -37,7 +37,7 @@ class CSVWriter(FileWriterStrategy):
     
     @property
     def supported_extensions(self) -> list[str]:
-        return ['.csv', '.txt']
+        return ['.csv']
     
     def can_write(self, file_path: Path) -> bool:
         return file_path.suffix.lower() in self.supported_extensions
@@ -132,7 +132,7 @@ class FileWriterFactory:
             # Örnek: "WriterName (*.ext1;*.ext2)" ve QFileDialog filtresi olarak "*.ext1;*.ext2"
             patterns = ';'.join(f'*{e}' for e in exts)
             # Kullanıcıya gösterilecek isimde strateji sınıf adını ve uzantıları listeliyoruz
-            name = f"{strategy.__class__.__name__} ({', '.join(exts)})"
+            name = f"{', '.join(exts)}"
             file_filter = f"{strategy.__class__.__name__} ({patterns})"
             default = exts[0]
 
