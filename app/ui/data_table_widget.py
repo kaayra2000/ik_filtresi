@@ -3,7 +3,8 @@ Veri tablosu widget'ı - DataFrame'i görüntüler
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTableView, QLabel, QHBoxLayout,
-    QPushButton, QFileDialog, QHeaderView, QMessageBox
+    QWidget, QVBoxLayout, QTableView, QLabel, QHBoxLayout,
+    QPushButton, QFileDialog, QHeaderView, QMessageBox, QComboBox
 )
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, QVariant
 from PyQt6.QtGui import QColor
@@ -125,15 +126,15 @@ class DataTableWidget(QWidget):
         export_layout = QHBoxLayout()
         export_layout.addStretch()
         
-        self._export_csv_btn = QPushButton("CSV Olarak Kaydet")
-        self._export_csv_btn.clicked.connect(lambda: self._export_data('csv'))
-        self._export_csv_btn.setEnabled(False)
-        export_layout.addWidget(self._export_csv_btn)
+        self._format_combo = QComboBox()
+        self._format_combo.addItems(["Excel Dosyası (*.xlsx)", "CSV Dosyası (*.csv)"])
+        self._format_combo.setEnabled(False)
+        export_layout.addWidget(self._format_combo)
         
-        self._export_excel_btn = QPushButton("Excel Olarak Kaydet")
-        self._export_excel_btn.clicked.connect(lambda: self._export_data('xlsx'))
-        self._export_excel_btn.setEnabled(False)
-        export_layout.addWidget(self._export_excel_btn)
+        self._save_btn = QPushButton("Kaydet")
+        self._save_btn.clicked.connect(self._on_save_clicked)
+        self._save_btn.setEnabled(False)
+        export_layout.addWidget(self._save_btn)
         
         layout.addLayout(export_layout)
     
@@ -143,8 +144,8 @@ class DataTableWidget(QWidget):
         self._filtered_df = df
         self._model.set_dataframe(df)
         self._update_stats()
-        self._export_csv_btn.setEnabled(True)
-        self._export_excel_btn.setEnabled(True)
+        self._format_combo.setEnabled(True)
+        self._save_btn.setEnabled(True)
     
     def set_filtered_dataframe(self, df: pd.DataFrame):
         """Filtrelenmiş DataFrame'i ayarlar"""
@@ -173,6 +174,14 @@ class DataTableWidget(QWidget):
         else:
             self._stats_label.setText(f"Gösterilen: {filtered} / {total} kayıt")
     
+    def _on_save_clicked(self):
+        """Kaydet butonuna tıklandığında"""
+        selected_index = self._format_combo.currentIndex()
+        if selected_index == 0:
+            self._export_data('xlsx')
+        else:
+            self._export_data('csv')
+
     def _export_data(self, format: str):
         """Veriyi dosyaya aktarır"""
         if self._filtered_df is None or len(self._filtered_df) == 0:
