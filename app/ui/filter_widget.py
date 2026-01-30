@@ -8,11 +8,147 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QDate
 from PyQt6.QtGui import QDoubleValidator
-from typing import List, Optional
+from typing import List, Optional, Any
 from datetime import datetime
 
 from app.models.column_info import ColumnInfo, ColumnType
 from app.models.filter_model import FilterModel, FilterOperator
+
+
+class FilterValueInput(QWidget):
+    """Base class for filter value input widgets"""
+    changed = pyqtSignal()
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.layout = QHBoxLayout(self)
+        self.layout.setContentsMargins(0, 0, 0, 0)
+        self.layout.setSpacing(5)
+
+    def get_value(self) -> Any:
+        raise NotImplementedError
+
+    def get_value2(self) -> Any:
+        return None
+
+class NumericInput(FilterValueInput):
+    def __init__(self, is_range: bool, min_val=None, max_val=None, parent=None):
+        super().__init__(parent)
+        self.is_range = is_range
+        
+        self.spin1 = self._create_spinbox(min_val, max_val)
+        self.layout.addWidget(self.spin1)
+        
+        if is_range:
+            self.layout.addWidget(QLabel("-"))
+            self.spin2 = self._create_spinbox(min_val, max_val)
+            self.layout.addWidget(self.spin2)
+
+    def _create_spinbox(self, min_val, max_val):
+        spin = QDoubleSpinBox()
+        spin.setRange(-999999999, 999999999)
+        spin.setDecimals(2)
+        if min_val is not None:
+            spin.setValue(float(min_val))
+        spin.valueChanged.connect(self.changed.emit)
+        return spin
+
+    def get_value(self) -> float:
+        return self.spin1.value()
+
+    def get_value2(self) -> Optional[float]:
+        return self.spin2.value() if self.is_range else None
+
+class DateInput(FilterValueInput):
+    def __init__(self, is_range: bool, min_val=None, max_val=None, parent=None):
+        super().__init__(parent)
+        self.is_range = is_range
+        
+        self.date1 = self._create_date_edit(min_val)
+        self.layout.addWidget(self.date1)
+        
+        if is_range:
+            self.layout.addWidget(QLabel("-"))
+            self.date2 = self._create_date_edit(max_val)
+            self.layout.addWidget(self.date2)
+
+    def _create_date_edit(self, val):
+        edit = QDateEdit()
+        edit.setCalendarPopup(True)
+        edit.setDisplayFormat("dd.MM.yyyy")
+        if val and isinstance(val, datetime):
+            edit.setDate(QDate(val.year, val.month, val.day))
+        else:
+            edit.setDate(QDate.currentDate())
+        edit.dateChanged.connect(self.changed.emit)
+        return edit
+
+    def get_value(self) -> datetime:
+        qdate = self.date1.date()
+        return datetime(qdate.year(), qdate.month(), qdate.day())
+
+    def get_value2(self) -> Optional[datetime]:
+        if not self.is_range:
+            return None
+        qdate = self.date2.date()
+        return datetime(qdate.year(), qdate.month(), qdate.day())
+
+class BooleanInput(FilterValueInput):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.combo = QComboBox()
+        self.combo.addItem("Evet / True", True)
+        self.combo.addItem("Hayır / False", False)
+        self.combo.currentIndexChanged.connect(self.changed.emit)
+        self.layout.addWidget(self.combo)
+
+    def get_value(self) -> bool:
+        return self.combo.currentData()
+
+class CategoricalInput(FilterValueInput):
+    def __init__(self, unique_values: List[Any], parent=None):
+        super().__init__(parent)
+        self.combo = QComboBox()
+        for val in unique_values:
+            self.combo.addItem(str(val), val)
+        self.combo.currentIndexChanged.connect(self.changed.emit)
+        self.layout.addWidget(self.combo)
+
+    def get_value(self) -> Any:
+        return self.combo.currentData()
+
+class ListInput(FilterValueInput):
+    def __init__(self, unique_values: List[Any], parent=None):
+        super().__init__(parent)
+        self.checkboxes = []
+        
+        container = QWidget()
+        v_layout = QVBoxLayout(container)
+        v_layout.setContentsMargins(0, 0, 0, 0)
+        v_layout.setSpacing(2)
+        
+        for val in unique_values:
+            cb = QCheckBox(str(val))
+            cb.setProperty("value", val)
+            cb.stateChanged.connect(self.changed.emit)
+            self.checkboxes.append(cb)
+            v_layout.addWidget(cb)
+            
+        self.layout.addWidget(container)
+
+    def get_value(self) -> List[Any]:
+        return [cb.property("value") for cb in self.checkboxes if cb.isChecked()]
+
+class TextInput(FilterValueInput):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.edit = QLineEdit()
+        self.edit.setPlaceholderText("Değer girin...")
+        self.edit.textChanged.connect(self.changed.emit)
+        self.layout.addWidget(self.edit)
+
+    def get_value(self) -> str:
+        return self.edit.text()
 
 
 class SingleFilterWidget(QFrame):
@@ -112,11 +248,7 @@ class SingleFilterWidget(QFrame):
             if item.widget():
                 item.widget().deleteLater()
         
-        # Eski widget referanslarını temizle
-        for attr in ['_value1_spin', '_value2_spin', '_value1_date', '_value2_date', 
-                     '_value_combo', '_list_checkboxes', '_value_edit']:
-            if hasattr(self, attr):
-                delattr(self, attr)
+        self._current_input: Optional[FilterValueInput] = None
         
         if self._current_column_info is None:
             return
@@ -132,124 +264,29 @@ class SingleFilterWidget(QFrame):
         col_type = self._current_column_info.column_type
         is_range = operator in [FilterOperator.BETWEEN, FilterOperator.NOT_BETWEEN]
         
-        # Tip ve kategorik duruma göre input oluştur
+        # Uygun input widget'ını oluştur
         if col_type == ColumnType.NUMERIC:
-            self._create_numeric_inputs(is_range)
+            self._current_input = NumericInput(is_range, 
+                                             self._current_column_info.min_value, 
+                                             self._current_column_info.max_value)
         elif col_type == ColumnType.DATE:
-            self._create_date_inputs(is_range)
+            self._current_input = DateInput(is_range, 
+                                          self._current_column_info.min_value, 
+                                          self._current_column_info.max_value)
         elif col_type == ColumnType.BOOLEAN:
-            self._create_boolean_input()
+            self._current_input = BooleanInput()
         elif col_type == ColumnType.TEXT:
             if operator in [FilterOperator.IN_LIST, FilterOperator.NOT_IN_LIST]:
-                self._create_list_input()
+                self._current_input = ListInput(self._current_column_info.unique_values)
             elif operator in [FilterOperator.EQUALS, FilterOperator.NOT_EQUALS] and \
                  self._current_column_info.is_categorical:
-                self._create_categorical_input()
+                self._current_input = CategoricalInput(self._current_column_info.unique_values)
             else:
-                self._create_text_input()
-    
-    def _create_numeric_inputs(self, is_range: bool):
-        """Sayısal değer girişi oluşturur"""
-        self._value1_spin = QDoubleSpinBox()
-        self._value1_spin.setRange(-999999999, 999999999)
-        self._value1_spin.setDecimals(2)
+                self._current_input = TextInput()
         
-        if self._current_column_info.min_value is not None:
-            self._value1_spin.setValue(float(self._current_column_info.min_value))
-        
-        self._value1_spin.valueChanged.connect(self.changed.emit)
-        self._value_layout.addWidget(self._value1_spin)
-        
-        if is_range:
-            self._value_layout.addWidget(QLabel("-"))
-            
-            self._value2_spin = QDoubleSpinBox()
-            self._value2_spin.setRange(-999999999, 999999999)
-            self._value2_spin.setDecimals(2)
-            
-            if self._current_column_info.max_value is not None:
-                self._value2_spin.setValue(float(self._current_column_info.max_value))
-            
-            self._value2_spin.valueChanged.connect(self.changed.emit)
-            self._value_layout.addWidget(self._value2_spin)
-    
-    def _create_date_inputs(self, is_range: bool):
-        """Tarih girişi oluşturur"""
-        self._value1_date = QDateEdit()
-        self._value1_date.setCalendarPopup(True)
-        self._value1_date.setDisplayFormat("dd.MM.yyyy")
-        
-        if self._current_column_info.min_value is not None:
-            try:
-                min_date = self._current_column_info.min_value
-                if isinstance(min_date, datetime):
-                    self._value1_date.setDate(QDate(min_date.year, min_date.month, min_date.day))
-            except Exception:
-                self._value1_date.setDate(QDate.currentDate())
-        
-        self._value1_date.dateChanged.connect(self.changed.emit)
-        self._value_layout.addWidget(self._value1_date)
-        
-        if is_range:
-            self._value_layout.addWidget(QLabel("-"))
-            
-            self._value2_date = QDateEdit()
-            self._value2_date.setCalendarPopup(True)
-            self._value2_date.setDisplayFormat("dd.MM.yyyy")
-            
-            if self._current_column_info.max_value is not None:
-                try:
-                    max_date = self._current_column_info.max_value
-                    if isinstance(max_date, datetime):
-                        self._value2_date.setDate(QDate(max_date.year, max_date.month, max_date.day))
-                except Exception:
-                    self._value2_date.setDate(QDate.currentDate())
-            
-            self._value2_date.dateChanged.connect(self.changed.emit)
-            self._value_layout.addWidget(self._value2_date)
-    
-    def _create_boolean_input(self):
-        """Boolean seçici oluşturur"""
-        self._value_combo = QComboBox()
-        self._value_combo.addItem("Evet / True", True)
-        self._value_combo.addItem("Hayır / False", False)
-        self._value_combo.currentIndexChanged.connect(self.changed.emit)
-        self._value_layout.addWidget(self._value_combo)
-    
-    def _create_categorical_input(self):
-        """Kategorik değer seçici oluşturur"""
-        self._value_combo = QComboBox()
-        for value in self._current_column_info.unique_values:
-            self._value_combo.addItem(str(value), value)
-        self._value_combo.currentIndexChanged.connect(self.changed.emit)
-        self._value_layout.addWidget(self._value_combo)
-    
-    def _create_list_input(self):
-        """Liste seçici (çoklu seçim) oluşturur"""
-        container = QWidget()
-        layout = QVBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(2)
-        
-        # Seçenekleri checkbox olarak göster (max 10)
-        self._list_checkboxes = []
-        values = self._current_column_info.unique_values[:20]
-        
-        for value in values:
-            cb = QCheckBox(str(value))
-            cb.setProperty("value", value)
-            cb.stateChanged.connect(self.changed.emit)
-            self._list_checkboxes.append(cb)
-            layout.addWidget(cb)
-        
-        self._value_layout.addWidget(container)
-    
-    def _create_text_input(self):
-        """Metin girişi oluşturur"""
-        self._value_edit = QLineEdit()
-        self._value_edit.setPlaceholderText("Değer girin...")
-        self._value_edit.textChanged.connect(self.changed.emit)
-        self._value_layout.addWidget(self._value_edit)
+        if self._current_input:
+            self._current_input.changed.connect(self.changed.emit)
+            self._value_layout.addWidget(self._current_input)
     
     def get_filter_model(self) -> Optional[FilterModel]:
         """Mevcut ayarlardan FilterModel oluşturur"""
@@ -267,37 +304,21 @@ class SingleFilterWidget(QFrame):
         if operator in [FilterOperator.IS_NULL, FilterOperator.IS_NOT_NULL]:
             pass
         
-        # Sayısal
-        elif self._current_column_info.column_type == ColumnType.NUMERIC:
-            if hasattr(self, '_value1_spin'):
-                value = self._value1_spin.value()
-            if hasattr(self, '_value2_spin') and operator in [FilterOperator.BETWEEN, FilterOperator.NOT_BETWEEN]:
-                value2 = self._value2_spin.value()
-        
-        # Tarih
-        elif self._current_column_info.column_type == ColumnType.DATE:
-            if hasattr(self, '_value1_date'):
-                qdate = self._value1_date.date()
-                value = datetime(qdate.year(), qdate.month(), qdate.day())
-            if hasattr(self, '_value2_date') and operator in [FilterOperator.BETWEEN, FilterOperator.NOT_BETWEEN]:
-                qdate = self._value2_date.date()
-                value2 = datetime(qdate.year(), qdate.month(), qdate.day())
-        
-        # Boolean veya Kategorik
-        elif hasattr(self, '_value_combo'):
-            value = self._value_combo.currentData()
-        
-        # Liste
-        elif hasattr(self, '_list_checkboxes'):
-            value = [cb.property("value") for cb in self._list_checkboxes if cb.isChecked()]
-            if not value:
+        elif self._current_input:
+            value = self._current_input.get_value()
+            value2 = self._current_input.get_value2()
+            
+            # Değer kontrolü (boş değerleri filtrele)
+            if value is None or (isinstance(value, str) and not value):
+                # Bazı operatörler boş değere izin verebilir mi? Genelde hayır.
                 return None
-        
-        # Metin
-        elif hasattr(self, '_value_edit'):
-            value = self._value_edit.text()
-            if not value and operator not in [FilterOperator.IS_NULL, FilterOperator.IS_NOT_NULL]:
+            
+            # Liste boşsa
+            if isinstance(value, list) and not value:
                 return None
+        else:
+            # Input yoksa ve null operatörü değilse geçersiz
+            return None
         
         return FilterModel(
             column_name=self._current_column_info.name,
