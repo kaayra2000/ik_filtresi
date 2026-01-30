@@ -1,0 +1,26 @@
+# Normalize line endings and ensure cross-platform compatibility
+# Auto-detect text files and normalize
+* text=auto
+
+# Enforce LF for source and config files (Linux-friendly)
+*.py text eol=lf
+*.sh text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.ini text eol=lf
+*.qss text eol=lf
+
+# Keep Windows scripts with CRLF
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Treat common binary files as binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
