@@ -127,7 +127,14 @@ class DataTableWidget(QWidget):
         export_layout.addStretch()
         
         self._format_combo = QComboBox()
-        self._format_combo.addItems(["Excel Dosyası (*.xlsx)", "CSV Dosyası (*.csv)"])
+        # Populate formats dynamically from FileWriterFactory
+        writer_factory = FileWriterFactory()
+        for desc in writer_factory.get_format_descriptors():
+            idx = self._format_combo.count()
+            self._format_combo.addItem(desc['name'])
+            # store descriptor dict on the item for later use
+            self._format_combo.setItemData(idx, desc, Qt.ItemDataRole.UserRole)
+
         self._format_combo.setEnabled(False)
         export_layout.addWidget(self._format_combo)
         
@@ -176,25 +183,23 @@ class DataTableWidget(QWidget):
     
     def _on_save_clicked(self):
         """Kaydet butonuna tıklandığında"""
-        selected_index = self._format_combo.currentIndex()
-        if selected_index == 0:
-            self._export_data('xlsx')
-        else:
-            self._export_data('csv')
+        idx = self._format_combo.currentIndex()
+        if idx < 0:
+            return
 
-    def _export_data(self, format: str):
+        desc = self._format_combo.itemData(idx, Qt.ItemDataRole.UserRole)
+        if not desc:
+            return
+
+        file_filter = desc.get('filter', '')
+        default_suffix = desc.get('default', '')
+
+        self._export_data_with_filter(file_filter, default_suffix)
+    def _export_data_with_filter(self, file_filter: str, default_suffix: str):
         """Veriyi dosyaya aktarır"""
         if self._filtered_df is None or len(self._filtered_df) == 0:
             QMessageBox.warning(self, "Uyarı", "Dışa aktarılacak veri yok!")
             return
-        
-        if format == 'csv':
-            file_filter = "CSV Dosyaları (*.csv)"
-            default_suffix = ".csv"
-        else:
-            file_filter = "Excel Dosyaları (*.xlsx)"
-            default_suffix = ".xlsx"
-        
         file_path, _ = QFileDialog.getSaveFileName(
             self,
             "Dosyayı Kaydet",
