@@ -332,6 +332,5 @@ class MainWindow(QMainWindow):
                 <li>Çoklu filtre desteği</li>
                 <li>Filtrelenmiş veri dışa aktarma</li>
             </ul>
-            <p>SOLID prensipleriyle geliştirilmiştir.</p>
             """
         )
