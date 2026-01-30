@@ -2,9 +2,8 @@
 Ana pencere - Uygulamanın ana arayüzü
 """
 from PyQt6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel,
-    QPushButton, QFileDialog, QMessageBox, QSplitter, QStatusBar,
-    QGroupBox, QProgressBar
+    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFileDialog,
+    QMessageBox, QSplitter, QStatusBar, QGroupBox, QProgressBar
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QAction
@@ -152,8 +151,9 @@ class MainWindow(QMainWindow):
         
         splitter.addWidget(right_panel)
         
-        # Splitter oranları
-        splitter.setSizes([400, 800])
+        # Splitter oranları — veri önizlemeyi biraz daha küçük yapıp sol paneli büyütüyoruz
+        # (soldan, sağdan) örn: sol 430, sağ 770
+        splitter.setSizes([430, 770])
         
         main_layout.addWidget(splitter)
         

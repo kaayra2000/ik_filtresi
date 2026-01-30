@@ -34,7 +34,7 @@ QLabel#sectionLabel {
 }
 
 /* Butonlar */
-QPushButton {
+QToolButton {
     background-color: #3498db;
     color: white;
     border: none;
@@ -43,52 +43,52 @@ QPushButton {
     min-width: 80px;
 }
 
-QPushButton:hover {
+QToolButton:hover {
     background-color: #2980b9;
 }
 
-QPushButton:pressed {
+QToolButton:pressed {
     background-color: #21618c;
 }
 
-QPushButton:disabled {
+QToolButton:disabled {
     background-color: #bdc3c7;
     color: #7f8c8d;
 }
 
-QPushButton#primaryButton {
+QToolButton#primaryButton {
     background-color: #27ae60;
 }
 
-QPushButton#primaryButton:hover {
+QToolButton#primaryButton:hover {
     background-color: #229954;
 }
 
-QPushButton#dangerButton {
+QToolButton#dangerButton {
     background-color: #e74c3c;
 }
 
-QPushButton#dangerButton:hover {
+QToolButton#dangerButton:hover {
     background-color: #c0392b;
 }
 
-QPushButton#addFilterButton {
+QToolButton#addFilterButton {
     background-color: #9b59b6;
     font-weight: bold;
 }
 
-QPushButton#addFilterButton:hover {
+QToolButton#addFilterButton:hover {
     background-color: #8e44ad;
 }
 
-QPushButton#removeButton {
+QToolButton#removeButton {
     background-color: #e74c3c;
     padding: 4px 8px;
     min-width: 30px;
     font-weight: bold;
 }
 
-QPushButton#removeButton:hover {
+QToolButton#removeButton:hover {
     background-color: #c0392b;
 }
 

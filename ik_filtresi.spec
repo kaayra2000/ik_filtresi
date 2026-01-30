@@ -13,6 +13,16 @@ datas = [
     (str(project_root / 'style.qss'), '.'),
 ]
 
+# Include any files placed in app/ui/icons into the build.
+# This walks the icons directory at spec runtime and appends every file
+# so PyInstaller embeds them while preserving the app/... path.
+icons_dir = project_root / 'app' / 'ui' / 'icons'
+if icons_dir.exists():
+    for p in icons_dir.rglob('*'):
+        if p.is_file():
+            dest = str(p.parent.relative_to(project_root))
+            datas.append((str(p), dest))
+
 # Gizli importlar (PyQt6 ve pandas için gerekli)
 hiddenimports = [
     'PyQt6',

@@ -4,12 +4,13 @@ Veri tablosu widget'ı - DataFrame'i görüntüler
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTableView, QLabel, QHBoxLayout,
     QWidget, QVBoxLayout, QTableView, QLabel, QHBoxLayout,
-    QPushButton, QFileDialog, QHeaderView, QMessageBox, QComboBox
+    QToolButton, QFileDialog, QHeaderView, QMessageBox, QComboBox
 )
-from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, QVariant
-from PyQt6.QtGui import QColor
+from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, QVariant, QSize
+from PyQt6.QtGui import QColor, QIcon, QPixmap
 from typing import Optional
 from pathlib import Path
+from app.ui.icon_factory import IconFactory
 
 import pandas as pd
 from app.services.file_writer import FileWriterFactory
@@ -138,7 +139,8 @@ class DataTableWidget(QWidget):
         self._format_combo.setEnabled(False)
         export_layout.addWidget(self._format_combo)
         
-        self._save_btn = QPushButton("Kaydet")
+        # use a left-aligned tool button with icon
+        self._save_btn = IconFactory.create_tool_button("save.svg", "Kaydet")
         self._save_btn.clicked.connect(self._on_save_clicked)
         self._save_btn.setEnabled(False)
         export_layout.addWidget(self._save_btn)
