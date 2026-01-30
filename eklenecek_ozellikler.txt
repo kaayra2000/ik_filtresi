@@ -4,3 +4,4 @@
 4-) excel csv kaydetmek için ayrı bir buton olmasın kaydetme türü seçilsin ve tek kaydet butonu olsun.
 5-) tarihle alakalı işleri yürütecek bir sarmalayıcı sınıf olmalı ve if self.column_type == ColumnType.DATE: gibi koşullar olmamalı.
 6-) csv dosyasından tarih okuyamama hatası giderilsin (ya yazarken ya okurken sıkıntı var)
+7-) geri al özellikleri de eklensin

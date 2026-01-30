@@ -350,6 +350,73 @@ class SingleFilterWidget(QFrame):
             value2=value2
         )
 
+    def apply_filter_model(self, filter_model: FilterModel):
+        """Programmatically set the widget state from a FilterModel"""
+        # Set column
+        target_col = filter_model.column_name
+        idx = -1
+        for i in range(self._column_combo.count()):
+            data = self._column_combo.itemData(i)
+            if data and getattr(data, "name", None) == target_col:
+                idx = i
+                break
+        if idx >= 0:
+            self._column_combo.setCurrentIndex(idx)
+        # Set operator
+        op = filter_model.operator
+        for i in range(self._operator_combo.count()):
+            if self._operator_combo.itemData(i) == op:
+                self._operator_combo.setCurrentIndex(i)
+                break
+        # Now inputs should be created
+        if self._current_input is None:
+            return
+        val = filter_model.value
+        val2 = filter_model.value2
+        # Numeric
+        if isinstance(self._current_input, NumericInput):
+            try:
+                if val is not None:
+                    self._current_input.spin1.setValue(float(val))
+                if val2 is not None and hasattr(self._current_input, 'spin2'):
+                    self._current_input.spin2.setValue(float(val2))
+            except Exception:
+                pass
+        # Date
+        elif isinstance(self._current_input, DateInput):
+            from PyQt6.QtCore import QDate
+            try:
+                if isinstance(val, datetime):
+                    self._current_input.date1.setDate(QDate(val.year, val.month, val.day))
+                if val2 is not None and isinstance(val2, datetime) and hasattr(self._current_input, 'date2'):
+                    self._current_input.date2.setDate(QDate(val2.year, val2.month, val2.day))
+            except Exception:
+                pass
+        # Boolean
+        elif isinstance(self._current_input, BooleanInput):
+            for i in range(self._current_input.combo.count()):
+                if self._current_input.combo.itemData(i) == val:
+                    self._current_input.combo.setCurrentIndex(i)
+                    break
+        # Categorical
+        elif isinstance(self._current_input, CategoricalInput):
+            for i in range(self._current_input.combo.count()):
+                if self._current_input.combo.itemData(i) == val:
+                    self._current_input.combo.setCurrentIndex(i)
+                    break
+        # List
+        elif isinstance(self._current_input, ListInput):
+            try:
+                values = set(val or [])
+                for cb in self._current_input.checkboxes:
+                    cb.setChecked(cb.property("value") in values)
+            except Exception:
+                pass
+        # Text
+        elif isinstance(self._current_input, TextInput):
+            if val is not None:
+                self._current_input.edit.setText(str(val))
+
 
 class FilterWidget(QWidget):
     """
@@ -446,6 +513,25 @@ class FilterWidget(QWidget):
             widget.deleteLater()
         self._filter_widgets.clear()
         self.filters_changed.emit([])
+
+    def add_filter_from_model(self, filter_model: FilterModel):
+        """Add a filter widget and populate it from FilterModel"""
+        widget = SingleFilterWidget(self._column_infos)
+        widget.removed.connect(self._remove_filter)
+        widget.changed.connect(self._on_filter_changed)
+        self._filter_widgets.append(widget)
+        self._filters_layout.insertWidget(self._filters_layout.count() - 1, widget)
+        # Apply model after insertion (so comboboxes are ready)
+        widget.apply_filter_model(filter_model)
+        self._on_filter_changed()
+
+    def set_filters(self, filters: List[FilterModel]):
+        """Replace existing filters with provided list"""
+        self._clear_filters()
+        for f in filters:
+            self.add_filter_from_model(f)
+        # Emit change with current filters
+        self.filters_changed.emit(self.get_filters())
     
     def _on_filter_changed(self):
         """Herhangi bir filtre değiştiğinde çağrılır"""

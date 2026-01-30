@@ -16,6 +16,7 @@ import pandas as pd
 from app.services.file_reader import FileReaderFactory
 from app.services.data_analyzer import DataAnalyzer
 from app.services.filter_engine import FilterEngine
+from app.services.filter_persistence import FilterPersistence
 from app.models.column_info import ColumnInfo
 from app.models.filter_model import FilterModel
 from app.ui.column_info_widget import ColumnInfoWidget
@@ -71,6 +72,7 @@ class MainWindow(QMainWindow):
         
         self._file_reader = FileReaderFactory()
         self._filter_engine = FilterEngine()
+        self._filter_persistence = FilterPersistence()
         
         self._setup_ui()
         self._setup_menu()
@@ -265,11 +267,22 @@ class MainWindow(QMainWindow):
         # Widget'ları güncelle
         self._column_info_widget.set_column_infos(column_infos)
         self._filter_widget.set_column_infos(column_infos)
-        self._data_table_widget.set_dataframe(df)
-        
-        self._status_bar.showMessage(
-            f"Dosya yüklendi: {len(df)} satır, {len(df.columns)} sütun"
-        )
+        # Load saved filters if compatible with this file
+        saved_filters = self._filter_persistence.load_filters()
+        if saved_filters and self._filter_persistence.is_compatible(saved_filters, column_infos):
+            # ensure table has original df set, then set and apply filters
+            self._data_table_widget.set_dataframe(df)
+            self._filter_widget.set_filters(saved_filters)
+            self._status_bar.showMessage("Kayıtlı filtreler yüklendi ve uygulandı.")
+        elif saved_filters:
+            # There are saved filters but not compatible
+            self._data_table_widget.set_dataframe(df)
+            self._status_bar.showMessage("Kayıtlı filtre bulundu ancak bu dosyayla uyumlu değil. Filtreler yüklenmedi.")
+        else:
+            self._data_table_widget.set_dataframe(df)
+            self._status_bar.showMessage(
+                f"Dosya yüklendi: {len(df)} satır, {len(df.columns)} sütun"
+            )
     
     def _on_load_error(self, error_message: str):
         """Yükleme hatası"""
@@ -302,7 +315,7 @@ class MainWindow(QMainWindow):
             self._status_bar.showMessage(
                 f"Filtre uygulandı: {len(filtered_df)} sonuç | {summary}"
             )
-            
+            self._filter_persistence.save_filters(filters)
         except Exception as e:
             QMessageBox.warning(
                 self,
