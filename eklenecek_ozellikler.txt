@@ -1,2 +1,7 @@
 5-) tarihle alakalı işleri yürütecek bir sarmalayıcı sınıf olmalı ve if self.column_type == ColumnType.DATE: gibi koşullar olmamalı.
 7-) geri al özellikleri de eklensin
+8-) filtre kısmına orlama eklenmeli
+9-) filtre ekleme ekranı daha kullanıcı dostu olsun
+10-) filtreler de altta bilgi olarak gözüksün
+11-) tool tip text eklenebilir
+12-) arayüzde bazı ekranlar tıklanınca açılabilir
