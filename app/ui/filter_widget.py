@@ -61,6 +61,7 @@ class NumericInput(FilterValueInput):
     def _create_spinbox(self, min_val, max_val):
         spin = QDoubleSpinBox()
         spin.setDecimals(2)
+        spin.setToolTip("Sayısal değer girin veya okları kullanın")
         # Constrain to column min/max if available
         if min_val is not None and max_val is not None:
             spin.setRange(float(min_val), float(max_val))
@@ -102,6 +103,7 @@ class DateInput(FilterValueInput):
         edit = QDateEdit()
         edit.setCalendarPopup(True)
         edit.setDisplayFormat("dd.MM.yyyy")
+        edit.setToolTip("Tarih seçmek için tıklayın veya manuel girin (GG.AA.YYYY)")
         # set allowed range
         if isinstance(min_val, datetime):
             edit.setMinimumDate(QDate(min_val.year, min_val.month, min_val.day))
@@ -131,6 +133,7 @@ class BooleanInput(FilterValueInput):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.combo = QComboBox()
+        self.combo.setToolTip("Mantıksal değer seçin (Evet/Hayır)")
         self.combo.addItem("Evet / True", True)
         self.combo.addItem("Hayır / False", False)
         self.combo.currentIndexChanged.connect(self.changed.emit)
@@ -143,6 +146,7 @@ class CategoricalInput(FilterValueInput):
     def __init__(self, unique_values: List[Any], parent=None):
         super().__init__(parent)
         self.combo = QComboBox()
+        self.combo.setToolTip("Mevcut değerlerden birini seçin")
         for val in unique_values:
             self.combo.addItem(str(val), val)
         self.combo.currentIndexChanged.connect(self.changed.emit)
@@ -164,6 +168,7 @@ class ListInput(FilterValueInput):
         for val in unique_values:
             cb = QCheckBox(str(val))
             cb.setProperty("value", val)
+            cb.setToolTip(f"'{val}' değerini filtreye dahil et")
             cb.stateChanged.connect(self.changed.emit)
             self.checkboxes.append(cb)
             v_layout.addWidget(cb)
@@ -178,6 +183,7 @@ class TextInput(FilterValueInput):
         super().__init__(parent)
         self.edit = QLineEdit()
         self.edit.setPlaceholderText("Değer girin...")
+        self.edit.setToolTip("Filtrelemek istediğiniz metin değerini girin")
         self.edit.textChanged.connect(self.changed.emit)
         self.layout.addWidget(self.edit)
 
@@ -208,6 +214,7 @@ class SingleFilterWidget(QFrame):
         # Sütun seçici
         self._column_combo = QComboBox()
         self._column_combo.setMinimumWidth(150)
+        self._column_combo.setToolTip("Filtrelemek istediğiniz sütunu seçin")
         self._column_combo.addItem("Sütun Seçin...", None)
         for info in self._column_infos:
             self._column_combo.addItem(str(info.name), info)
@@ -217,6 +224,7 @@ class SingleFilterWidget(QFrame):
         # Operatör seçici
         self._operator_combo = QComboBox()
         self._operator_combo.setMinimumWidth(120)
+        self._operator_combo.setToolTip("Karşılaştırma operatörünü seçin (eşittir, büyüktür, içerir vb.)")
         self._operator_combo.setEnabled(False)
         self._operator_combo.currentIndexChanged.connect(self._on_operator_changed)
         self._main_layout.addWidget(self._operator_combo)
@@ -233,6 +241,7 @@ class SingleFilterWidget(QFrame):
         # Kaldır butonu (küçük toolbutton) - ikon kullan
         remove_btn = IconFactory.create_tool_button("remove.svg")
         remove_btn.setObjectName("removeButton")
+        remove_btn.setToolTip("Bu filtreyi kaldır")
         remove_btn.setFixedSize(30, 30)
         remove_btn.clicked.connect(lambda: self.removed.emit(self))
         self._main_layout.addWidget(remove_btn)
@@ -492,31 +501,33 @@ class FilterGroupWidget(QFrame):
         # Grup ikonu
         group_icon_label = QLabel()
         group_icon_label.setPixmap(IconFactory.load_icon("group.svg").pixmap(18, 18))
+        group_icon_label.setToolTip("Filtre grubu - içindeki filtreler VE/VEYA ile birleştirilebilir")
         header_layout.addWidget(group_icon_label)
         
         # Grup etiketi
         depth_label = QLabel(f"Grup (Seviye {self._depth})")
         depth_label.setStyleSheet("font-weight: bold; color: #37474f;")
+        depth_label.setToolTip(f"Bu grup {self._depth}. seviyede, iç içe gruplar oluşturabilirsiniz")
         header_layout.addWidget(depth_label)
         
         header_layout.addStretch()
         
         # Filtre ekle butonu
         add_filter_btn = IconFactory.create_tool_button("add_filter.svg", "Filtre Ekle")
-        add_filter_btn.setToolTip("Bu gruba yeni bir filtre ekle")
+        add_filter_btn.setToolTip("Bu gruba yeni bir filtre koşulu ekle (sütun, operatör, değer)")
         add_filter_btn.clicked.connect(self._add_filter)
         header_layout.addWidget(add_filter_btn)
         
         # Alt grup ekle butonu
         add_group_btn = IconFactory.create_tool_button("add_group.svg", "Grup Ekle")
-        add_group_btn.setToolTip("Bu gruba yeni bir alt grup ekle")
+        add_group_btn.setToolTip("Karmaşık filtreler için yeni bir alt grup ekle (örn: (A VE B) VEYA (C VE D))")
         add_group_btn.clicked.connect(self._add_group)
         header_layout.addWidget(add_group_btn)
         
         # Grubu kaldır butonu (kök grup hariç)
         if self._depth > 0:
             remove_btn = IconFactory.create_tool_button("remove.svg", "Grubu Kaldır")
-            remove_btn.setToolTip("Bu grubu kaldır")
+            remove_btn.setToolTip("Bu grubu ve içindeki tüm filtreleri kaldır")
             remove_btn.setObjectName("removeButton")
             remove_btn.clicked.connect(lambda: self.removed.emit(self))
             header_layout.addWidget(remove_btn)
@@ -545,7 +556,7 @@ class FilterGroupWidget(QFrame):
         combo.addItem("VE", LogicalOperator.AND)
         combo.addItem("VEYA", LogicalOperator.OR)
         combo.setCurrentIndex(0)  # Varsayılan: VE
-        combo.setToolTip("Bu filtreyi öncekiyle birleştirme mantığı")
+        combo.setToolTip("VE: Her iki koşul da sağlanmalı | VEYA: Koşullardan biri yeterli")
         combo.currentIndexChanged.connect(self._on_operator_changed)
         combo.setStyleSheet("""
             QComboBox {
@@ -858,6 +869,7 @@ class FilterDialog(QDialog):
         self._summary_label = QLabel("Henüz filtre eklenmedi")
         self._summary_label.setObjectName("summaryContent")
         self._summary_label.setWordWrap(True)
+        self._summary_label.setToolTip("Aktif filtrelerin özeti")
         
         layout.addWidget(self._summary_label)
         
@@ -890,7 +902,7 @@ class FilterDialog(QDialog):
         
         # İptal butonu
         self._cancel_btn = IconFactory.create_tool_button("clear.svg", "İptal")
-        self._cancel_btn.setToolTip("Değişiklikleri iptal et")
+        self._cancel_btn.setToolTip("Değişiklikleri kaydetmeden pencereyi kapat (Escape)")
         self._cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(self._cancel_btn)
 

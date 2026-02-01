@@ -1,5 +1,5 @@
 """
-Sütun bilgisi modeli - Sütunların tip ve içerik bilgilerini tutar
+Sütun bilgisi modeli - Sütunların tür ve içerik bilgilerini tutar
 """
 from dataclasses import dataclass, field
 from enum import Enum, auto
@@ -9,7 +9,7 @@ from app.models.formatters import FormatterFactory, ValueFormatter
 
 
 class ColumnType(Enum):
-    """Sütun veri tipleri"""
+    """Sütun veri türleri"""
     NUMERIC = auto()
     DATE = auto()
     TEXT = auto()

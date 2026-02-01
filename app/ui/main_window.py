@@ -109,6 +109,7 @@ class MainWindow(QMainWindow):
         
         self._file_label = QLabel("Dosya seçilmedi")
         self._file_label.setObjectName("fileLabel")
+        self._file_label.setToolTip("Yüklenen veri dosyasının adı")
         header_layout.addWidget(self._file_label)
         
         main_layout.addLayout(header_layout)
@@ -117,6 +118,7 @@ class MainWindow(QMainWindow):
         self._progress_bar = QProgressBar()
         self._progress_bar.setVisible(False)
         self._progress_bar.setRange(0, 0)  # Indeterminate
+        self._progress_bar.setToolTip("Dosya yükleme işlemi devam ediyor...")
         main_layout.addWidget(self._progress_bar)
         
         # Compact action buttons above data preview (filter & column analysis)
@@ -141,7 +143,7 @@ class MainWindow(QMainWindow):
         self._colinfo_button = IconFactory.create_tool_button("columns.svg", "Sütun Ayrıntıları")
         self._colinfo_button.setObjectName("colInfoButton")
         self._colinfo_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
-        self._colinfo_button.setToolTip("Sütun ayrıntılarını göster")
+        self._colinfo_button.setToolTip("Sütun türlerini, istatistiklerini ve değer aralıklarını görüntüle")
         self._colinfo_button.clicked.connect(self._open_column_info_dialog)
         actions_layout.addWidget(self._colinfo_button)
 

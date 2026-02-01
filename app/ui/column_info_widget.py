@@ -28,6 +28,7 @@ class ColumnInfoCard(QFrame):
         name_label = QLabel(f"{self.column_info.name}")
         name_label.setObjectName("sectionLabel")
         name_label.setStyleSheet("font-weight: bold; color: #2c3e50;")
+        name_label.setToolTip(f"Sütun adı: {self.column_info.name}")
         layout.addWidget(name_label)
         
         # Tip
@@ -48,7 +49,8 @@ class ColumnInfoCard(QFrame):
         
         icon = type_icons.get(self.column_info.column_type, "❓")
         type_name = type_names.get(self.column_info.column_type, "Bilinmiyor")
-        type_label = QLabel(f"Tip: {icon} {type_name}")
+        type_label = QLabel(f"Tür: {icon} {type_name}")
+        type_label.setToolTip(f"Veri türü: {type_name} - Filtreleme seçenekleri bu türe göre belirlenir")
         layout.addWidget(type_label)
         
         # İstatistikler
@@ -57,6 +59,7 @@ class ColumnInfoCard(QFrame):
         stats_text += f"Benzersiz: {self.column_info.unique_count}"
         stats_label = QLabel(stats_text)
         stats_label.setProperty("muted", True)
+        stats_label.setToolTip("Toplam kayıt sayısı, boş değer sayısı ve tekil değer sayısı")
         layout.addWidget(stats_label)
         
         # Tip'e göre ek bilgiler
@@ -64,15 +67,19 @@ class ColumnInfoCard(QFrame):
             range_text = f"Aralık: {self.column_info.get_display_range()}"
             range_label = QLabel(range_text)
             range_label.setStyleSheet("color: #27ae60; font-weight: bold;")
+            range_label.setToolTip("Bu sütundaki asgari ve azami değerler")
             layout.addWidget(range_label)
         
         elif self.column_info.column_type == ColumnType.TEXT:
             if self.column_info.is_categorical and self.column_info.unique_count <= 20:
                 # Kategorik değerler için combobox
                 values_layout = QHBoxLayout()
-                values_layout.addWidget(QLabel("Değerler:"))
+                values_label = QLabel("Değerler:")
+                values_label.setToolTip("Bu sütundaki tüm tekil değerler")
+                values_layout.addWidget(values_label)
                 
                 combo = QComboBox()
+                combo.setToolTip("Mevcut kategorik değerleri görmek için tıklayın")
                 combo.addItems([str(v) for v in self.column_info.unique_values])
                 combo.setMaximumWidth(200)
                 values_layout.addWidget(combo)
@@ -82,6 +89,7 @@ class ColumnInfoCard(QFrame):
             else:
                 unique_label = QLabel(f"Benzersiz değer sayısı: {self.column_info.unique_count}")
                 unique_label.setProperty("muted", True)
+                unique_label.setToolTip("Çok fazla tekil değer olduğundan kategorik olarak gösterilemiyor")
                 layout.addWidget(unique_label)
 
 

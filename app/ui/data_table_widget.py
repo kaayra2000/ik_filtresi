@@ -121,6 +121,7 @@ class DataTableWidget(QWidget):
         self._stats_label = QLabel()
         # use muted property to apply shared style from style.qss
         self._stats_label.setProperty("muted", True)
+        self._stats_label.setToolTip("Filtreleme sonucu görüntülenen ve toplam kayıt sayısı")
         header_layout.addWidget(self._stats_label)
         
         layout.addLayout(header_layout)
@@ -132,6 +133,7 @@ class DataTableWidget(QWidget):
         self._table_view.horizontalHeader().setStretchLastSection(True)
         self._table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
         self._table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self._table_view.setToolTip("Sütun başlıklarına tıklayarak sıralayabilirsiniz")
         
         self._model = PandasTableModel()
         self._table_view.setModel(self._model)
@@ -152,12 +154,14 @@ class DataTableWidget(QWidget):
 
         self._populate_format_combo()
         self._format_combo.setEnabled(False)
+        self._format_combo.setToolTip("Dışa aktarılacak dosya biçimini seçin")
         export_layout.addWidget(self._format_combo)
         
         # use a QPushButton with icon for save
         self._save_btn = QPushButton("Kaydet")
         self._save_btn.setIcon(IconFactory.load_icon("save.svg"))
         self._save_btn.setObjectName("saveButton")
+        self._save_btn.setToolTip("Filtrelenmiş veriyi seçili biçimde dosyaya kaydet")
         self._save_btn.clicked.connect(self._on_save_clicked)
         self._save_btn.setEnabled(False)
         export_layout.addWidget(self._save_btn)
