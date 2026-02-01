@@ -77,15 +77,6 @@ QToolButton#dangerButton:hover {
     background-color: #c0392b;
 }
 
-QToolButton#addFilterButton {
-    background-color: #9b59b6;
-    font-weight: bold;
-}
-
-QToolButton#addFilterButton:hover {
-    background-color: #8e44ad;
-}
-
 QToolButton#removeButton {
     background-color: #e74c3c;
     padding: 4px 8px;
@@ -308,58 +299,7 @@ QTabBar::tab:hover:!selected {
     background-color: #d5dbdb;
 }
 
-/* Filter Summary Frame */
-QFrame#filterSummaryFrame {
-    background-color: #f5f5f5;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 8px;
-}
-
-QFrame#filterSummaryFrame QLabel#summaryTitle {
-    font-weight: bold;
-    color: #333;
-}
-
-QFrame#filterSummaryFrame QLabel#summaryContent {
-    color: #666;
-    font-family: monospace;
-}
-
 /* === Collapsible Filter Panel === */
-QFrame#filterHeaderFrame {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #ffffff, stop:1 #f8f9fa);
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    padding: 8px 12px;
-}
-
-QFrame#filterHeaderFrame:hover {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #f8f9fa, stop:1 #e9ecef);
-    border-color: #3498db;
-}
-
-QLabel#toggleIcon {
-    font-size: 12pt;
-    font-weight: bold;
-    color: #3498db;
-}
-
-QLabel#filterTitle {
-    font-size: 14pt;
-    font-weight: bold;
-    color: #2c3e50;
-}
-
-QLabel#filterSummaryLabel {
-    color: #6c757d;
-    font-style: italic;
-    font-size: 12pt;
-    padding-left: 10px;
-}
-
 QToolButton#quickApplyButton {
     background-color: #27ae60;
     border-radius: 16px;
@@ -369,22 +309,6 @@ QToolButton#quickApplyButton {
 
 QToolButton#quickApplyButton:hover {
     background-color: #229954;
-}
-
-QFrame#filterContentFrame {
-    background-color: #ffffff;
-    border: 1px solid #dee2e6;
-    border-top: none;
-    border-radius: 0 0 8px 8px;
-    margin-top: -1px;
-}
-
-QLabel#filterInfoLabel {
-    color: #6c757d;
-    font-size: 11pt;
-    padding: 5px 10px;
-    background-color: #e7f3ff;
-    border-radius: 4px;
 }
 
 QScrollArea#filterScrollArea {
@@ -432,6 +356,61 @@ QToolButton#filterEditButton {
 
 QToolButton#filterEditButton:hover {
     background-color: #2980b9;
+}
+
+/* === Action Buttons (Filtreler & Sütunlar) === */
+QToolButton#filterButton {
+    background-color: #fff3e0;
+    color: #5d4037;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #ffcc80;
+    font-weight: bold;
+}
+
+QToolButton#filterButton:hover {
+    background-color: #ffe0b2;
+    border-color: #ffa726;
+    color: #3e2723;
+}
+
+QToolButton#colInfoButton {
+    background-color: #e3f2fd;
+    color: #1565c0;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #90caf9;
+    font-weight: bold;
+}
+
+QToolButton#colInfoButton:hover {
+    background-color: #bbdefb;
+    border-color: #42a5f5;
+    color: #0d47a1;
+}
+
+/* === Save Button === */
+QPushButton#saveButton {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    min-width: 100px;
+    font-weight: bold;
+}
+
+QPushButton#saveButton:hover {
+    background-color: #229954;
+}
+
+QPushButton#saveButton:pressed {
+    background-color: #1e8449;
+}
+
+QPushButton#saveButton:disabled {
+    background-color: #bdc3c7;
+    color: #7f8c8d;
 }
 
 /* === Filter Dialog === */

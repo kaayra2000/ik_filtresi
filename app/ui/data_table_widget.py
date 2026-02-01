@@ -3,8 +3,7 @@ Veri tablosu widget'ı - DataFrame'i görüntüler
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTableView, QLabel, QHBoxLayout,
-    QWidget, QVBoxLayout, QTableView, QLabel, QHBoxLayout,
-    QToolButton, QFileDialog, QHeaderView, QMessageBox, QComboBox
+    QToolButton, QFileDialog, QHeaderView, QMessageBox, QComboBox, QPushButton
 )
 from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, QVariant, QSize
 from PyQt6.QtGui import QColor, QIcon, QPixmap
@@ -25,6 +24,11 @@ class PandasTableModel(QAbstractTableModel):
     def __init__(self, df: pd.DataFrame = None, parent=None):
         super().__init__(parent)
         self._df = df if df is not None else pd.DataFrame()
+        self._column_infos = []
+
+    def set_column_infos(self, column_infos):
+        """Provide ColumnInfo list for header tooltips."""
+        self._column_infos = column_infos or []
     
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         if parent.isValid():
@@ -57,15 +61,28 @@ class PandasTableModel(QAbstractTableModel):
         return QVariant()
     
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole):
-        if role != Qt.ItemDataRole.DisplayRole:
-            return QVariant()
-        
-        if orientation == Qt.Orientation.Horizontal:
-            if section < len(self._df.columns):
-                return str(self._df.columns[section])
-        else:
-            return str(section + 1)
-        
+        # Display label
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Horizontal:
+                if section < len(self._df.columns):
+                    return str(self._df.columns[section])
+            else:
+                return str(section + 1)
+
+        # Tooltip for header: show column summary if available
+        if role == Qt.ItemDataRole.ToolTipRole and orientation == Qt.Orientation.Horizontal:
+            if section < len(self._df.columns) and section < len(self._column_infos):
+                ci = self._column_infos[section]
+                parts = [f"Tür: {ci.column_type.name}"]
+                parts.append(f"Boş: {ci.null_count}")
+                parts.append(f"Benzersiz: {ci.unique_count}")
+                if ci.column_type.name in ("NUMERIC", "DATE"):
+                    try:
+                        parts.append(f"Aralık: {ci.get_display_range()}")
+                    except Exception:
+                        pass
+                return " | ".join(parts)
+
         return QVariant()
     
     def set_dataframe(self, df: pd.DataFrame):
@@ -89,18 +106,15 @@ class DataTableWidget(QWidget):
         super().__init__(parent)
         self._original_df: Optional[pd.DataFrame] = None
         self._filtered_df: Optional[pd.DataFrame] = None
+        self._column_infos = []
         self._setup_ui()
     
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         
-        # Header
+        # Header - only stats label, no title
         header_layout = QHBoxLayout()
-        
-        self._title = QLabel("📊 Veri Tablosu")
-        self._title.setObjectName("sectionLabel")
-        header_layout.addWidget(self._title)
         
         header_layout.addStretch()
         
@@ -136,24 +150,27 @@ class DataTableWidget(QWidget):
         self._format_label.setContentsMargins(0, 0, 6, 0)
         export_layout.addWidget(self._format_label)
 
-        # Populate formats dynamically from FileWriterFactory
-        writer_factory = FileWriterFactory()
-        for desc in writer_factory.get_format_descriptors():
-            idx = self._format_combo.count()
-            self._format_combo.addItem(desc['name'])
-            # store descriptor dict on the item for later use
-            self._format_combo.setItemData(idx, desc, Qt.ItemDataRole.UserRole)
-
+        self._populate_format_combo()
         self._format_combo.setEnabled(False)
         export_layout.addWidget(self._format_combo)
         
-        # use a left-aligned tool button with icon
-        self._save_btn = IconFactory.create_tool_button("save.svg", "Kaydet")
+        # use a QPushButton with icon for save
+        self._save_btn = QPushButton("Kaydet")
+        self._save_btn.setIcon(IconFactory.load_icon("save.svg"))
+        self._save_btn.setObjectName("saveButton")
         self._save_btn.clicked.connect(self._on_save_clicked)
         self._save_btn.setEnabled(False)
         export_layout.addWidget(self._save_btn)
         
         layout.addLayout(export_layout)
+    
+    def _populate_format_combo(self):
+        """Format combo box'ı FileWriterFactory'den dinamik olarak doldurur (SRP)."""
+        writer_factory = FileWriterFactory()
+        for desc in writer_factory.get_format_descriptors():
+            idx = self._format_combo.count()
+            self._format_combo.addItem(desc['name'])
+            self._format_combo.setItemData(idx, desc, Qt.ItemDataRole.UserRole)
     
     def set_dataframe(self, df: pd.DataFrame):
         """Orijinal DataFrame'i ayarlar"""
@@ -163,6 +180,14 @@ class DataTableWidget(QWidget):
         self._update_stats()
         self._format_combo.setEnabled(True)
         self._save_btn.setEnabled(True)
+
+    def set_column_infos(self, column_infos):
+        """Keep column infos to provide header tooltips via model."""
+        self._column_infos = column_infos or []
+        try:
+            self._model.set_column_infos(self._column_infos)
+        except Exception:
+            pass
     
     def set_filtered_dataframe(self, df: pd.DataFrame):
         """Filtrelenmiş DataFrame'i ayarlar"""
@@ -205,6 +230,20 @@ class DataTableWidget(QWidget):
         default_suffix = desc.get('default', '')
 
         self._export_data_with_filter(file_filter, default_suffix)
+    
+    def _export_data(self, format_type: str):
+        """Menüden çağrılan export metodu - format türüne göre kaydetme yapar.
+        
+        FileWriterFactory'den dinamik olarak format bilgilerini alır (OCP uyumlu).
+        """
+        writer_factory = FileWriterFactory()
+        desc = writer_factory.get_descriptor_by_extension(format_type)
+        
+        if desc:
+            self._export_data_with_filter(desc['filter'], desc['default'])
+        else:
+            QMessageBox.warning(self, "Uyarı", f"Desteklenmeyen format: {format_type}")
+    
     def _export_data_with_filter(self, file_filter: str, default_suffix: str):
         """Veriyi dosyaya aktarır"""
         if self._filtered_df is None or len(self._filtered_df) == 0:

@@ -25,7 +25,7 @@ class ColumnInfoCard(QFrame):
         layout.setSpacing(5)
         
         # Sütun adı
-        name_label = QLabel(f"📊 {self.column_info.name}")
+        name_label = QLabel(f"{self.column_info.name}")
         name_label.setObjectName("sectionLabel")
         name_label.setStyleSheet("font-weight: bold; color: #2c3e50;")
         layout.addWidget(name_label)
@@ -101,7 +101,7 @@ class ColumnInfoWidget(QWidget):
         main_layout.setContentsMargins(0, 0, 0, 0)
         
         # Başlık
-        title = QLabel("📋 Sütun Bilgileri")
+        title = QLabel("Sütun Bilgileri")
         title.setObjectName("sectionLabel")
         main_layout.addWidget(title)
         
@@ -146,3 +146,26 @@ class ColumnInfoWidget(QWidget):
     @property
     def column_infos(self) -> List[ColumnInfo]:
         return self._column_infos
+
+
+from PyQt6.QtWidgets import QDialog, QVBoxLayout
+
+
+class ColumnInfoDialog(QDialog):
+    """Modal dialog for showing column analysis."""
+
+    def __init__(self, column_infos: List[ColumnInfo], parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Sütun Ayrıntıları")
+        self.setModal(True)
+        self.setMinimumSize(600, 400)
+
+        layout = QVBoxLayout(self)
+        self._widget = ColumnInfoWidget(self)
+        layout.addWidget(self._widget)
+
+        # initialize
+        self.set_column_infos(column_infos)
+
+    def set_column_infos(self, column_infos: List[ColumnInfo]):
+        self._widget.set_column_infos(column_infos)

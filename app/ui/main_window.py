@@ -3,23 +3,26 @@ Ana pencere - Uygulamanın ana arayüzü
 """
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QLabel, QFileDialog,
-    QMessageBox, QSplitter, QStatusBar, QGroupBox, QProgressBar
+    QMessageBox, QSplitter, QStatusBar, QGroupBox, QProgressBar, QDialog,
+    QPushButton, QSizePolicy, QApplication
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QAction
+from PyQt6.QtGui import QAction, QScreen
 from pathlib import Path
 from typing import Optional, List
 
 import pandas as pd
 
 from app.services.file_reader import FileReaderFactory
+from app.services.file_writer import FileWriterFactory
 from app.services.data_analyzer import DataAnalyzer
 from app.services.filter_engine import FilterEngine
 from app.services.filter_persistence import FilterPersistence
 from app.models.column_info import ColumnInfo
 from app.models.filter_model import FilterGroup
-from app.ui.column_info_widget import ColumnInfoWidget
-from app.ui.filter_widget import FilterWidget
+from app.ui.column_info_widget import ColumnInfoWidget, ColumnInfoDialog
+from app.ui.filter_widget import FilterWidget, FilterDialog
+from app.ui.icon_factory import IconFactory
 from app.ui.data_table_widget import DataTableWidget
 
 
@@ -82,8 +85,10 @@ class MainWindow(QMainWindow):
     
     def _setup_ui(self):
         """UI bileşenlerini oluşturur"""
-        self.setWindowTitle("IK Filtresi - Veri Filtreleme Aracı")
-        self.setMinimumSize(1200, 800)
+        self.setWindowTitle("Excel Filtresi - Veri Filtreleme Aracı")
+        
+        # Ekran çözünürlüğüne göre dinamik boyutlandırma
+        self._configure_window_size()
         
         # Central widget
         central = QWidget()
@@ -96,7 +101,7 @@ class MainWindow(QMainWindow):
         # Başlık ve dosya bilgisi
         header_layout = QHBoxLayout()
         
-        title = QLabel("📋 IK Filtresi")
+        title = QLabel("Excel Filtresi")
         title.setObjectName("titleLabel")
         header_layout.addWidget(title)
         
@@ -114,53 +119,100 @@ class MainWindow(QMainWindow):
         self._progress_bar.setRange(0, 0)  # Indeterminate
         main_layout.addWidget(self._progress_bar)
         
-        # Ana splitter
-        splitter = QSplitter(Qt.Orientation.Horizontal)
-        
-        # Sol panel - Sütun bilgileri ve filtreler
-        left_panel = QWidget()
-        left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Sütun bilgileri
-        column_group = QGroupBox("Sütun Analizi")
-        column_layout = QVBoxLayout(column_group)
-        self._column_info_widget = ColumnInfoWidget()
-        column_layout.addWidget(self._column_info_widget)
-        left_layout.addWidget(column_group)
-        
-        # Filtreler
-        filter_group = QGroupBox("Filtreler")
-        filter_layout = QVBoxLayout(filter_group)
+        # Compact action buttons above data preview (filter & column analysis)
+        actions_layout = QHBoxLayout()
+        actions_layout.setSpacing(8)
+
+        # Right-align buttons: add stretch first
+        actions_layout.addStretch()
+
+        # Create hidden stateful widgets (manage state, not shown)
         self._filter_widget = FilterWidget()
-        filter_layout.addWidget(self._filter_widget)
-        left_layout.addWidget(filter_group)
-        
-        splitter.addWidget(left_panel)
-        
-        # Sağ panel - Veri tablosu
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        
+        self._column_info_widget = ColumnInfoWidget()
+
+        # Use IconFactory to create tool buttons with icons
+        self._filter_button = IconFactory.create_tool_button("filter.svg", "Filtreler")
+        self._filter_button.setObjectName("filterButton")
+        self._filter_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        self._filter_button.setToolTip("Filtreleri düzenle")
+        self._filter_button.clicked.connect(self._open_filter_dialog)
+        actions_layout.addWidget(self._filter_button)
+
+        self._colinfo_button = IconFactory.create_tool_button("columns.svg", "Sütun Ayrıntıları")
+        self._colinfo_button.setObjectName("colInfoButton")
+        self._colinfo_button.setSizePolicy(QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        self._colinfo_button.setToolTip("Sütun ayrıntılarını göster")
+        self._colinfo_button.clicked.connect(self._open_column_info_dialog)
+        actions_layout.addWidget(self._colinfo_button)
+
+        main_layout.addLayout(actions_layout)
+
+        # Veri önizleme (ortak alan)
         data_group = QGroupBox("Veri Önizleme")
         data_layout = QVBoxLayout(data_group)
         self._data_table_widget = DataTableWidget()
         data_layout.addWidget(self._data_table_widget)
-        right_layout.addWidget(data_group)
-        
-        splitter.addWidget(right_panel)
-        
-        # Splitter oranları — veri önizlemeyi biraz daha küçük yapıp sol paneli büyütüyoruz
-        # (soldan, sağdan) örn: sol 430, sağ 770
-        splitter.setSizes([430, 770])
-        
-        main_layout.addWidget(splitter)
+        main_layout.addWidget(data_group)
         
         # Status bar
         self._status_bar = QStatusBar()
         self.setStatusBar(self._status_bar)
         self._status_bar.showMessage("Hazır")
+    
+    def _configure_window_size(self):
+        """
+        Ekran çözünürlüğüne göre pencere boyutlarını dinamik olarak ayarlar.
+        Çoklu monitör desteği ile o an bulunulan monitöre göre boyutlandırır.
+        """
+        # Mevcut ekranı al (çoklu monitör desteği)
+        screen = self._get_current_screen()
+        screen_geometry = screen.availableGeometry()
+        
+        screen_width = screen_geometry.width()
+        screen_height = screen_geometry.height()
+        
+        # Minimum boyutları ekran çözünürlüğüne orantılı hesapla
+        # Minimum boyut: ekranın %50'si genişlik, %50'si yükseklik
+        min_width = int(screen_width * 0.5)
+        min_height = int(screen_height * 0.5)
+        
+        # Makul minimum sınırlar (çok küçük ekranlar için)
+        min_width = max(min_width, 800)
+        min_height = max(min_height, 600)
+        
+        self.setMinimumSize(min_width, min_height)
+        
+        # Başlangıç boyutu: ekranın %75'i genişlik, %80'i yükseklik
+        initial_width = int(screen_width * 0.75)
+        initial_height = int(screen_height * 0.80)
+        
+        self.resize(initial_width, initial_height)
+        
+        # Pencereyi ekranın ortasına konumlandır
+        self._center_on_screen(screen_geometry)
+    
+    def _get_current_screen(self) -> QScreen:
+        """
+        Mevcut/birincil ekranı döndürür.
+        Çoklu monitör durumunda fare imlecinin bulunduğu ekranı tercih eder.
+        """
+        # Fare imlecinin bulunduğu ekranı bul
+        cursor_pos = QApplication.instance().primaryScreen().geometry().center()
+        
+        # Tüm ekranları kontrol et
+        for screen in QApplication.screens():
+            if screen.geometry().contains(cursor_pos):
+                return screen
+        
+        # Varsayılan olarak birincil ekranı döndür
+        return QApplication.primaryScreen()
+    
+    def _center_on_screen(self, screen_geometry):
+        """Pencereyi verilen ekran geometrisinin ortasına konumlandırır"""
+        window_geometry = self.frameGeometry()
+        center_point = screen_geometry.center()
+        window_geometry.moveCenter(center_point)
+        self.move(window_geometry.topLeft())
     
     def _setup_menu(self):
         """Menü çubuğunu oluşturur"""
@@ -176,15 +228,24 @@ class MainWindow(QMainWindow):
         
         file_menu.addSeparator()
         
-        export_csv = QAction("CSV Olarak &Kaydet...", self)
-        export_csv.setShortcut("Ctrl+S")
-        export_csv.triggered.connect(lambda: self._data_table_widget._export_data('csv'))
-        file_menu.addAction(export_csv)
+        # FileWriterFactory'den dinamik olarak export seçeneklerini oluştur (OCP uyumlu)
+        writer_factory = FileWriterFactory()
+        shortcuts = ["Ctrl+S", "Ctrl+Shift+S"]  # İlk iki format için kısayollar
         
-        export_excel = QAction("&Excel Olarak Kaydet...", self)
-        export_excel.setShortcut("Ctrl+Shift+S")
-        export_excel.triggered.connect(lambda: self._data_table_widget._export_data('xlsx'))
-        file_menu.addAction(export_excel)
+        for idx, desc in enumerate(writer_factory.get_format_descriptors()):
+            ext = desc.get('default', '').lstrip('.')
+            action_text = f"{ext.upper()} Olarak Kaydet..."
+            export_action = QAction(action_text, self)
+            
+            # İlk iki format için kısayol ata
+            if idx < len(shortcuts):
+                export_action.setShortcut(shortcuts[idx])
+            
+            # Lambda'da closure problemi için default argument kullan
+            export_action.triggered.connect(
+                lambda checked, fmt=ext: self._data_table_widget._export_data(fmt)
+            )
+            file_menu.addAction(export_action)
         
         file_menu.addSeparator()
         
@@ -193,18 +254,6 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
-        # Filtre menüsü
-        filter_menu = menubar.addMenu("F&iltre")
-        
-        add_filter = QAction("Filtre &Ekle", self)
-        add_filter.setShortcut("Ctrl+F")
-        add_filter.triggered.connect(self._add_filter_from_menu)
-        filter_menu.addAction(add_filter)
-        
-        clear_filters = QAction("Filtreleri &Temizle", self)
-        clear_filters.setShortcut("Ctrl+Shift+F")
-        clear_filters.triggered.connect(self._clear_filters)
-        filter_menu.addAction(clear_filters)
         
         # Yardım menüsü
         help_menu = menubar.addMenu("&Yardım")
@@ -216,6 +265,46 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         """Sinyalleri bağlar"""
         self._filter_widget.filter_group_changed.connect(self._apply_filter_group)
+        self._filter_widget.filter_group_changed.connect(self._update_filter_button_tooltip)
+
+    def _update_filter_button_tooltip(self, group=None):
+        """Update filter button tooltip to show current summary."""
+        try:
+            # Eğer group parametresi verilmişse, ondan özet oluştur
+            if group is not None and not group.is_empty():
+                summary = group.to_display_string()
+            elif group is not None and group.is_empty():
+                summary = "Filtre yok"
+            else:
+                summary = "Filtre yok - düzenlemek için tıklayın"
+            
+            # Keep tooltip short
+            tooltip = summary if len(summary) <= 300 else summary[:300] + "..."
+            self._filter_button.setToolTip(tooltip)
+        except Exception:
+            self._filter_button.setToolTip("Filtreleri düzenle")
+
+    def _open_filter_dialog(self):
+        """Open modal filter dialog from compact button."""
+        if not self._column_infos:
+            QMessageBox.warning(self, "Uyarı", "Önce bir veri dosyası yükleyin.")
+            return
+
+        dialog = FilterDialog(self._column_infos, self._filter_widget.get_filter_group(), self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            new_group = dialog.get_filter_group()
+            self._filter_widget.set_filter_group(new_group)
+            self._apply_filter_group(new_group)
+            self._update_filter_button_tooltip(new_group)
+
+    def _open_column_info_dialog(self):
+        """Open column analysis as modal dialog."""
+        if not self._column_infos:
+            QMessageBox.information(self, "Bilgi", "Önce bir veri dosyası yükleyin.")
+            return
+
+        dialog = ColumnInfoDialog(self._column_infos, self)
+        dialog.exec()
     
     def _prompt_file_selection(self):
         """Dosya seçim dialogunu gösterir"""
@@ -261,6 +350,8 @@ class MainWindow(QMainWindow):
         # Widget'ları güncelle
         self._column_info_widget.set_column_infos(column_infos)
         self._filter_widget.set_column_infos(column_infos)
+        # Provide column infos to data table for header tooltips
+        self._data_table_widget.set_column_infos(column_infos)
         
         # Kaydedilmiş filtreleri yükle
         saved_group = self._filter_persistence.load_filter_group()
@@ -270,9 +361,13 @@ class MainWindow(QMainWindow):
             # Filtreleri yükle ve uygula
             self._filter_widget.set_filter_group(saved_group)
             self._apply_filter_group(saved_group)
+            # Tooltip'i kaydedilmiş filtrelerle güncelle
+            self._update_filter_button_tooltip(saved_group)
             self._status_bar.showMessage("Kayıtlı filtreler yüklendi ve uygulandı.")
         else:
             self._data_table_widget.set_dataframe(df)
+            # Filtre yoksa tooltip'i güncelle
+            self._update_filter_button_tooltip()
             self._status_bar.showMessage(
                 f"Dosya yüklendi: {len(df)} satır, {len(df.columns)} sütun"
             )
@@ -314,18 +409,6 @@ class MainWindow(QMainWindow):
                 "Filtre Hatası",
                 f"Filtre uygulanırken hata oluştu:\n{str(e)}"
             )
-    
-    def _clear_filters(self):
-        """Filtreleri temizler"""
-        self._filter_widget._clear_filters()
-        if self._df is not None:
-            self._data_table_widget.reset_to_original()
-        self._status_bar.showMessage("Filtreler temizlendi")
-    
-    def _add_filter_from_menu(self):
-        """Menüden filtre ekle"""
-        if self._filter_widget._root_group:
-            self._filter_widget._root_group._add_filter()
     
     def _show_about(self):
         """Hakkında dialogu"""

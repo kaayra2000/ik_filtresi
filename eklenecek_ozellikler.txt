@@ -1,3 +1,2 @@
 7-) geri al özellikleri de eklensin
 11-) tool tip text eklenebilir
-12-) arayüzde bazı ekranlar tıklanınca açılabilir

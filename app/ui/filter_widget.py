@@ -489,8 +489,13 @@ class FilterGroupWidget(QFrame):
         header_layout = QHBoxLayout()
         header_layout.setSpacing(8)
         
+        # Grup ikonu
+        group_icon_label = QLabel()
+        group_icon_label.setPixmap(IconFactory.load_icon("group.svg").pixmap(18, 18))
+        header_layout.addWidget(group_icon_label)
+        
         # Grup etiketi
-        depth_label = QLabel(f"📁 Grup (Seviye {self._depth})")
+        depth_label = QLabel(f"Grup (Seviye {self._depth})")
         depth_label.setStyleSheet("font-weight: bold; color: #37474f;")
         header_layout.addWidget(depth_label)
         
