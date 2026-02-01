@@ -1,4 +1,3 @@
 7-) geri al özellikleri de eklensin
-filtreleme ekranı açıldığında filtre ekleme silme düzenleme işlemmleri için memento desenini kulllanarak geri al özellikleri de eklensin
-12-) koyu tema ekle
+filtreleme ekranı açıldığında filtre ekleme silme düzenleme işlemmleri için memento desenini kullanarak geri al özellikleri de eklensin
 13-) çok fazla kategorik değer için içerisinde seçeneği arayüzü bozuyor düzlet

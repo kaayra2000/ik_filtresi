@@ -417,3 +417,105 @@ QPushButton#saveButton:disabled {
 QDialog {
     background-color: #f5f5f5;
 }
+
+/* === Filter Group Widget - Açık Tema === */
+QFrame#filterGroupFrame {
+    background-color: #e3f2fd;
+    border: 2px solid #90a4ae;
+    border-radius: 8px;
+    margin: 4px;
+    padding: 8px;
+}
+
+QFrame#filterGroupFrame[depth="0"] {
+    background-color: #e3f2fd;
+}
+
+QFrame#filterGroupFrame[depth="1"] {
+    background-color: #fff3e0;
+}
+
+QFrame#filterGroupFrame[depth="2"] {
+    background-color: #e8f5e9;
+}
+
+QFrame#filterGroupFrame[depth="3"] {
+    background-color: #fce4ec;
+}
+
+QFrame#filterGroupFrame[depth="4"] {
+    background-color: #f3e5f5;
+}
+
+QLabel#groupDepthLabel {
+    font-weight: bold;
+    color: #37474f;
+    background-color: transparent;
+}
+
+/* === Buton Renk Farklılıkları - Açık Tema === */
+
+/* Kaydet butonu - Mavi */
+QToolButton#saveFilterButton {
+    background-color: #1976d2;
+    border: 1px solid #1565c0;
+    color: #ffffff;
+}
+
+QToolButton#saveFilterButton:hover {
+    background-color: #1565c0;
+}
+
+/* Yükle butonu - Mor */
+QToolButton#loadFilterButton {
+    background-color: #7e57c2;
+    border: 1px solid #5e35b1;
+    color: #ffffff;
+}
+
+QToolButton#loadFilterButton:hover {
+    background-color: #5e35b1;
+}
+
+/* İptal butonu - Gri */
+QToolButton#cancelButton {
+    background-color: #607d8b;
+    border: 1px solid #455a64;
+    color: #ffffff;
+}
+
+QToolButton#cancelButton:hover {
+    background-color: #455a64;
+}
+
+/* === VE/VEYA Operatör Seçici - Açık Tema === */
+QComboBox#logicalOperatorCombo {
+    background-color: #fff8e1;
+    border: 2px solid #ffc107;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-weight: bold;
+    color: #f57c00;
+}
+
+QComboBox#logicalOperatorCombo:hover {
+    border-color: #ff9800;
+}
+
+QComboBox#logicalOperatorCombo QAbstractItemView {
+    background-color: #fff8e1;
+    selection-background-color: #ffc107;
+    selection-color: #ffffff;
+}
+
+QFrame#operatorLine {
+    background-color: #ffc107;
+}
+
+QWidget#operatorRow {
+    background-color: transparent;
+}
+
+QFrame#groupSeparator {
+    background-color: #90a4ae;
+}

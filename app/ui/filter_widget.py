@@ -478,17 +478,9 @@ class FilterGroupWidget(QFrame):
         self.setObjectName("filterGroupFrame")
         self.setFrameShape(QFrame.Shape.StyledPanel)
         
-        # Derinliğe göre arka plan rengi
-        color_index = self._depth % len(self.GROUP_COLORS)
-        self.setStyleSheet(f"""
-            QFrame#filterGroupFrame {{
-                background-color: {self.GROUP_COLORS[color_index]};
-                border: 2px solid #90a4ae;
-                border-radius: 8px;
-                margin: 4px;
-                padding: 8px;
-            }}
-        """)
+        # Derinliğe göre farklı objectName - tema QSS'i bunu kullanacak
+        depth_name = f"filterGroupDepth{self._depth % 5}"
+        self.setProperty("depth", self._depth % 5)
         
         main_layout = QVBoxLayout(self)
         main_layout.setSpacing(8)
@@ -506,7 +498,7 @@ class FilterGroupWidget(QFrame):
         
         # Grup etiketi
         depth_label = QLabel(f"Grup (Seviye {self._depth})")
-        depth_label.setStyleSheet("font-weight: bold; color: #37474f;")
+        depth_label.setObjectName("groupDepthLabel")
         depth_label.setToolTip(f"Bu grup {self._depth}. seviyede, iç içe gruplar oluşturabilirsiniz")
         header_layout.addWidget(depth_label)
         
@@ -536,8 +528,8 @@ class FilterGroupWidget(QFrame):
         
         # Ayırıcı çizgi
         separator = QFrame()
+        separator.setObjectName("groupSeparator")
         separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setStyleSheet("background-color: #90a4ae;")
         main_layout.addWidget(separator)
         
         # Çocuk elemanlar için container
@@ -552,38 +544,27 @@ class FilterGroupWidget(QFrame):
     def _create_operator_combo(self) -> QComboBox:
         """Operatör seçici oluşturur"""
         combo = QComboBox()
+        combo.setObjectName("logicalOperatorCombo")
         combo.setFixedWidth(80)
         combo.addItem("VE", LogicalOperator.AND)
         combo.addItem("VEYA", LogicalOperator.OR)
         combo.setCurrentIndex(0)  # Varsayılan: VE
         combo.setToolTip("VE: Her iki koşul da sağlanmalı | VEYA: Koşullardan biri yeterli")
         combo.currentIndexChanged.connect(self._on_operator_changed)
-        combo.setStyleSheet("""
-            QComboBox {
-                background-color: #fff8e1;
-                border: 2px solid #ffc107;
-                border-radius: 4px;
-                padding: 4px 8px;
-                font-weight: bold;
-                color: #f57c00;
-            }
-            QComboBox:hover {
-                border-color: #ff9800;
-            }
-        """)
         return combo
     
     def _create_operator_row(self) -> QWidget:
         """Operatör satırı oluşturur (VE/VEYA seçici)"""
         row = QWidget()
+        row.setObjectName("operatorRow")
         row_layout = QHBoxLayout(row)
         row_layout.setContentsMargins(20, 2, 20, 2)
         row_layout.setSpacing(8)
         
         # Sol çizgi
         left_line = QFrame()
+        left_line.setObjectName("operatorLine")
         left_line.setFrameShape(QFrame.Shape.HLine)
-        left_line.setStyleSheet("background-color: #ffc107;")
         left_line.setFixedHeight(2)
         row_layout.addWidget(left_line, 1)
         
@@ -593,8 +574,8 @@ class FilterGroupWidget(QFrame):
         
         # Sağ çizgi
         right_line = QFrame()
+        right_line.setObjectName("operatorLine")
         right_line.setFrameShape(QFrame.Shape.HLine)
-        right_line.setStyleSheet("background-color: #ffc107;")
         right_line.setFixedHeight(2)
         row_layout.addWidget(right_line, 1)
         
@@ -902,6 +883,7 @@ class FilterDialog(QDialog):
         
         # İptal butonu
         self._cancel_btn = IconFactory.create_tool_button("clear.svg", "İptal")
+        self._cancel_btn.setObjectName("cancelButton")
         self._cancel_btn.setToolTip("Değişiklikleri kaydetmeden pencereyi kapat (Escape)")
         self._cancel_btn.clicked.connect(self.reject)
         button_layout.addWidget(self._cancel_btn)

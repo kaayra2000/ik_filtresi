@@ -8,9 +8,10 @@ block_cipher = None
 # Proje kök dizini
 project_root = Path(SPECPATH)
 
-# Veri dosyaları (QSS stil dosyası dahil)
+# Veri dosyaları (QSS stil dosyaları dahil)
 datas = [
     (str(project_root / 'style.qss'), '.'),
+    (str(project_root / 'style_dark.qss'), '.'),
 ]
 
 # Include any files placed in app/ui/icons into the build.

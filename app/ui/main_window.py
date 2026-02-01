@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import (
     QMessageBox, QSplitter, QStatusBar, QGroupBox, QProgressBar, QDialog,
     QPushButton, QSizePolicy, QApplication
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings
 from PyQt6.QtGui import QAction, QScreen
 from pathlib import Path
 from typing import Optional, List
@@ -24,6 +24,10 @@ from app.ui.column_info_widget import ColumnInfoWidget, ColumnInfoDialog
 from app.ui.filter_widget import FilterWidget, FilterDialog
 from app.ui.icon_factory import IconFactory
 from app.ui.data_table_widget import DataTableWidget
+
+# Uygulama ayarları için sabitler
+APP_NAME = "IKFiltresi"
+APP_ORG = "IKFiltresi"
 
 
 class FileLoaderThread(QThread):
@@ -71,6 +75,8 @@ class MainWindow(QMainWindow):
         self._file_path: Optional[Path] = None
         self._df: Optional[pd.DataFrame] = None
         self._column_infos: List[ColumnInfo] = []
+        self._current_theme: str = "light"  # Varsayılan tema
+        self._settings = QSettings(APP_ORG, APP_NAME)  # Ayarları yükle/kaydet
         
         self._file_reader = FileReaderFactory()
         self._filter_engine = FilterEngine()
@@ -79,6 +85,9 @@ class MainWindow(QMainWindow):
         self._setup_ui()
         self._setup_menu()
         self._connect_signals()
+        
+        # Kaydedilmiş temayı yükle
+        self._load_saved_theme()
         
         # Uygulama açılınca dosya seç
         self._prompt_file_selection()
@@ -92,6 +101,7 @@ class MainWindow(QMainWindow):
         
         # Central widget
         central = QWidget()
+        central.setObjectName("centralWidget")
         self.setCentralWidget(central)
         
         main_layout = QVBoxLayout(central)
@@ -256,6 +266,23 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
+        # Görünüm menüsü (Tema seçimi)
+        view_menu = menubar.addMenu("&Görünüm")
+        
+        # Tema alt menüsü
+        theme_menu = view_menu.addMenu("🎨 Tema")
+        
+        self._light_theme_action = QAction("☀️ Açık Tema", self)
+        self._light_theme_action.setCheckable(True)
+        self._light_theme_action.setChecked(True)
+        self._light_theme_action.triggered.connect(lambda: self._set_theme("light"))
+        theme_menu.addAction(self._light_theme_action)
+        
+        self._dark_theme_action = QAction("🌙 Koyu Tema", self)
+        self._dark_theme_action.setCheckable(True)
+        self._dark_theme_action.setChecked(False)
+        self._dark_theme_action.triggered.connect(lambda: self._set_theme("dark"))
+        theme_menu.addAction(self._dark_theme_action)
         
         # Yardım menüsü
         help_menu = menubar.addMenu("&Yardım")
@@ -429,3 +456,55 @@ class MainWindow(QMainWindow):
             </ul>
             """
         )
+    
+    def _set_theme(self, theme: str):
+        """Tema değiştirir (light/dark)"""
+        self._current_theme = theme
+        
+        # Menü checkbox'larını güncelle
+        self._light_theme_action.setChecked(theme == "light")
+        self._dark_theme_action.setChecked(theme == "dark")
+        
+        # Uygun stil dosyasını yükle
+        self._load_theme_stylesheet(theme)
+        
+        # Temayı kaydet
+        self._save_theme(theme)
+        
+        self._status_bar.showMessage(
+            f"{'Koyu' if theme == 'dark' else 'Açık'} tema uygulandı"
+        )
+    
+    def _load_saved_theme(self):
+        """Kaydedilmiş tema tercihini yükler"""
+        saved_theme = self._settings.value("theme", "light")
+        if saved_theme in ("light", "dark"):
+            self._set_theme(saved_theme)
+    
+    def _save_theme(self, theme: str):
+        """Tema tercihini kaydeder"""
+        self._settings.setValue("theme", theme)
+        self._settings.sync()  # Hemen diske yaz
+    
+    def _load_theme_stylesheet(self, theme: str):
+        """Temaya göre uygun stil dosyasını yükler"""
+        # Stil dosyalarının yollarını belirle
+        base_path = Path(__file__).parent.parent.parent
+        
+        if theme == "dark":
+            style_path = base_path / "style_dark.qss"
+        else:
+            style_path = base_path / "style.qss"
+        
+        if style_path.exists():
+            with open(style_path, "r", encoding="utf-8") as f:
+                stylesheet = f.read()
+            
+            # Ana uygulamaya stili uygula
+            app = QApplication.instance()
+            if app:
+                app.setStyleSheet(stylesheet)
+    
+    def _reload_stylesheet(self):
+        """Stil dosyasını yeniden yükler (mevcut tema için)"""
+        self._load_theme_stylesheet(self._current_theme)
