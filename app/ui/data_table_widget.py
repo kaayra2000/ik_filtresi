@@ -5,13 +5,14 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QTableView, QLabel, QHBoxLayout,
     QToolButton, QFileDialog, QHeaderView, QMessageBox, QComboBox, QPushButton
 )
-from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, QVariant, QSize
+from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex, QVariant, QSize, QSortFilterProxyModel
 from PyQt6.QtGui import QColor, QIcon, QPixmap
 from typing import Optional
 from pathlib import Path
 from app.ui.icon_factory import IconFactory
 
 import pandas as pd
+import numpy as np
 from app.services.file_writer import FileWriterFactory
 
 
@@ -58,6 +59,14 @@ class PandasTableModel(QAbstractTableModel):
             if index.row() % 2 == 0:
                 return QColor(248, 249, 250)
         
+        # Sıralama için ham veri döndür
+        elif role == Qt.ItemDataRole.UserRole:
+            value = self._df.iloc[index.row(), index.column()]
+            # NaN/NaT değerleri sıralamada en sona koymak için
+            if pd.isna(value):
+                return None
+            return value
+        
         return QVariant()
     
     def headerData(self, section: int, orientation: Qt.Orientation, role: int = Qt.ItemDataRole.DisplayRole):
@@ -94,6 +103,52 @@ class PandasTableModel(QAbstractTableModel):
     def get_dataframe(self) -> pd.DataFrame:
         """Mevcut DataFrame'i döndürür"""
         return self._df
+
+
+class PandasSortProxyModel(QSortFilterProxyModel):
+    """
+    Pandas DataFrame için özelleştirilmiş sıralama proxy modeli.
+    Sayısal ve tarih verilerini doğru şekilde sıralar.
+    """
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setSortRole(Qt.ItemDataRole.UserRole)
+    
+    def lessThan(self, left: QModelIndex, right: QModelIndex) -> bool:
+        """İki değeri karşılaştırır - sayısal ve tarih sıralaması için özelleştirilmiş"""
+        left_data = self.sourceModel().data(left, Qt.ItemDataRole.UserRole)
+        right_data = self.sourceModel().data(right, Qt.ItemDataRole.UserRole)
+        
+        # None değerlerini en sona koy
+        if left_data is None and right_data is None:
+            return False
+        if left_data is None:
+            return False  # None değerler sonda
+        if right_data is None:
+            return True   # None olmayan değerler önde
+        
+        # Aynı tip ise doğrudan karşılaştır
+        try:
+            # Sayısal karşılaştırma
+            if isinstance(left_data, (int, float, np.integer, np.floating)):
+                if isinstance(right_data, (int, float, np.integer, np.floating)):
+                    return float(left_data) < float(right_data)
+            
+            # Tarih karşılaştırma
+            if isinstance(left_data, (pd.Timestamp, np.datetime64)):
+                if isinstance(right_data, (pd.Timestamp, np.datetime64)):
+                    return left_data < right_data
+            
+            # String karşılaştırma (büyük/küçük harf duyarsız)
+            if isinstance(left_data, str) and isinstance(right_data, str):
+                return left_data.lower() < right_data.lower()
+            
+            # Genel karşılaştırma
+            return str(left_data).lower() < str(right_data).lower()
+        except (TypeError, ValueError):
+            # Karşılaştırılamayan tipler için string karşılaştırma
+            return str(left_data).lower() < str(right_data).lower()
 
 
 class DataTableWidget(QWidget):
@@ -135,8 +190,16 @@ class DataTableWidget(QWidget):
         self._table_view.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
         self._table_view.setToolTip("Sütun başlıklarına tıklayarak sıralayabilirsiniz")
         
+        # Kaynak model
         self._model = PandasTableModel()
-        self._table_view.setModel(self._model)
+        
+        # Sıralama için proxy model
+        self._proxy_model = PandasSortProxyModel()
+        self._proxy_model.setSourceModel(self._model)
+        
+        self._table_view.setModel(self._proxy_model)
+        # Varsayılan olarak sıralama göstergesini gizle (ilk tıklamada görünür olur)
+        self._table_view.horizontalHeader().setSortIndicatorShown(True)
         
         layout.addWidget(self._table_view)
         
