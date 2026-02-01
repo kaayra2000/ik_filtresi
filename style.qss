@@ -77,15 +77,6 @@ QToolButton#dangerButton:hover {
     background-color: #c0392b;
 }
 
-QToolButton#addFilterButton {
-    background-color: #9b59b6;
-    font-weight: bold;
-}
-
-QToolButton#addFilterButton:hover {
-    background-color: #8e44ad;
-}
-
 QToolButton#removeButton {
     background-color: #e74c3c;
     padding: 4px 8px;
@@ -306,4 +297,225 @@ QTabBar::tab:selected {
 
 QTabBar::tab:hover:!selected {
     background-color: #d5dbdb;
+}
+
+/* === Collapsible Filter Panel === */
+QToolButton#quickApplyButton {
+    background-color: #27ae60;
+    border-radius: 16px;
+    min-width: 32px;
+    padding: 4px;
+}
+
+QToolButton#quickApplyButton:hover {
+    background-color: #229954;
+}
+
+QScrollArea#filterScrollArea {
+    border: 1px solid #e9ecef;
+    border-radius: 4px;
+    background-color: #fafafa;
+}
+
+/* === Filter Summary Panel (Ana ekran) === */
+QFrame#filterSummaryPanel {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #ffffff, stop:1 #f8f9fa);
+    border: 2px solid #dee2e6;
+    border-radius: 10px;
+    padding: 8px;
+}
+
+QFrame#filterSummaryPanel:hover {
+    border-color: #3498db;
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #f8f9fa, stop:1 #e9ecef);
+}
+
+QLabel#filterIcon {
+    font-size: 24pt;
+}
+
+QLabel#filterPanelTitle {
+    font-size: 14pt;
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+QLabel#filterPanelSummary {
+    color: #6c757d;
+    font-size: 11pt;
+}
+
+QToolButton#filterEditButton {
+    background-color: #3498db;
+    border-radius: 18px;
+    min-width: 36px;
+    padding: 6px;
+}
+
+QToolButton#filterEditButton:hover {
+    background-color: #2980b9;
+}
+
+/* === Action Buttons (Filtreler & Sütunlar) === */
+QToolButton#filterButton {
+    background-color: #fff3e0;
+    color: #5d4037;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #ffcc80;
+    font-weight: bold;
+}
+
+QToolButton#filterButton:hover {
+    background-color: #ffe0b2;
+    border-color: #ffa726;
+    color: #3e2723;
+}
+
+QToolButton#colInfoButton {
+    background-color: #e3f2fd;
+    color: #1565c0;
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #90caf9;
+    font-weight: bold;
+}
+
+QToolButton#colInfoButton:hover {
+    background-color: #bbdefb;
+    border-color: #42a5f5;
+    color: #0d47a1;
+}
+
+/* === Save Button === */
+QPushButton#saveButton {
+    background-color: #27ae60;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    min-width: 100px;
+    font-weight: bold;
+}
+
+QPushButton#saveButton:hover {
+    background-color: #229954;
+}
+
+QPushButton#saveButton:pressed {
+    background-color: #1e8449;
+}
+
+QPushButton#saveButton:disabled {
+    background-color: #bdc3c7;
+    color: #7f8c8d;
+}
+
+/* === Filter Dialog === */
+QDialog {
+    background-color: #f5f5f5;
+}
+
+/* === Filter Group Widget - Açık Tema === */
+QFrame#filterGroupFrame {
+    background-color: #e3f2fd;
+    border: 2px solid #90a4ae;
+    border-radius: 8px;
+    margin: 4px;
+    padding: 8px;
+}
+
+QFrame#filterGroupFrame[depth="0"] {
+    background-color: #e3f2fd;
+}
+
+QFrame#filterGroupFrame[depth="1"] {
+    background-color: #fff3e0;
+}
+
+QFrame#filterGroupFrame[depth="2"] {
+    background-color: #e8f5e9;
+}
+
+QFrame#filterGroupFrame[depth="3"] {
+    background-color: #fce4ec;
+}
+
+QFrame#filterGroupFrame[depth="4"] {
+    background-color: #f3e5f5;
+}
+
+QLabel#groupDepthLabel {
+    font-weight: bold;
+    color: #37474f;
+    background-color: transparent;
+}
+
+/* === Buton Renk Farklılıkları - Açık Tema === */
+
+/* Kaydet butonu - Mavi */
+QToolButton#saveFilterButton {
+    background-color: #1976d2;
+    border: 1px solid #1565c0;
+    color: #ffffff;
+}
+
+QToolButton#saveFilterButton:hover {
+    background-color: #1565c0;
+}
+
+/* Yükle butonu - Mor */
+QToolButton#loadFilterButton {
+    background-color: #7e57c2;
+    border: 1px solid #5e35b1;
+    color: #ffffff;
+}
+
+QToolButton#loadFilterButton:hover {
+    background-color: #5e35b1;
+}
+
+/* İptal butonu - Gri */
+QToolButton#cancelButton {
+    background-color: #607d8b;
+    border: 1px solid #455a64;
+    color: #ffffff;
+}
+
+QToolButton#cancelButton:hover {
+    background-color: #455a64;
+}
+
+/* === VE/VEYA Operatör Seçici - Açık Tema === */
+QComboBox#logicalOperatorCombo {
+    background-color: #fff8e1;
+    border: 2px solid #ffc107;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-weight: bold;
+    color: #f57c00;
+}
+
+QComboBox#logicalOperatorCombo:hover {
+    border-color: #ff9800;
+}
+
+QComboBox#logicalOperatorCombo QAbstractItemView {
+    background-color: #fff8e1;
+    selection-background-color: #ffc107;
+    selection-color: #ffffff;
+}
+
+QFrame#operatorLine {
+    background-color: #ffc107;
+}
+
+QWidget#operatorRow {
+    background-color: transparent;
+}
+
+QFrame#groupSeparator {
+    background-color: #90a4ae;
 }

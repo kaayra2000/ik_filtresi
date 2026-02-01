@@ -8,10 +8,16 @@ block_cipher = None
 # Proje kök dizini
 project_root = Path(SPECPATH)
 
-# Veri dosyaları (QSS stil dosyası dahil)
+# Veri dosyaları (QSS stil dosyaları dahil)
 datas = [
     (str(project_root / 'style.qss'), '.'),
+    (str(project_root / 'style_dark.qss'), '.'),
 ]
+
+# Versiyon dosyası (build sırasında oluşturulur)
+version_file = project_root / 'version.txt'
+if version_file.exists():
+    datas.append((str(version_file), '.'))
 
 # Include any files placed in app/ui/icons into the build.
 # This walks the icons directory at spec runtime and appends every file

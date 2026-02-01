@@ -1,2 +1,2 @@
-5-) tarihle alakalı işleri yürütecek bir sarmalayıcı sınıf olmalı ve if self.column_type == ColumnType.DATE: gibi koşullar olmamalı.
 7-) geri al özellikleri de eklensin
+filtreleme ekranı açıldığında filtre ekleme silme düzenleme işlemmleri için memento desenini kullanarak geri al özellikleri de eklensin

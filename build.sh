@@ -19,6 +19,14 @@ if ! command -v pyinstaller &> /dev/null; then
     pip install pyinstaller
 fi
 
+# Versiyon bilgisi (argüman olarak alınır veya varsayılan kullanılır)
+VERSION=${1:-"dev"}
+echo "📌 Versiyon: $VERSION"
+
+# Versiyon dosyası oluştur
+echo "$VERSION" > version.txt
+echo "📝 version.txt oluşturuldu"
+
 # Önceki build'i temizle
 echo "🧹 Önceki build dosyaları temizleniyor..."
 rm -rf build/ dist/

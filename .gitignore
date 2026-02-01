@@ -4,3 +4,4 @@ file_example*.xlsx
 file_example*.xls
 build/
 .venv/
+version.txt

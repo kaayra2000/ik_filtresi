@@ -1,14 +1,18 @@
 """
 Filtre motoru - Filtreleri DataFrame üzerinde uygular
+
+Composite Pattern desteği ile hem tekil filtreler hem de
+hiyerarşik filtre grupları (AND/OR kombinasyonları) uygulanabilir.
 """
-from typing import List
 import re
 
 import pandas as pd
 import numpy as np
 
-from app.models.filter_model import FilterModel, FilterOperator
-from app.models.column_info import ColumnType
+from app.models.filter_model import (
+    FilterModel, FilterOperator, FilterGroup, 
+    FilterComponent, LogicalOperator
+)
 
 
 class FilterEngine:
@@ -41,28 +45,63 @@ class FilterEngine:
             FilterOperator.IS_NOT_NULL: self._apply_is_not_null,
         }
     
-    def apply_filters(self, df: pd.DataFrame, filters: List[FilterModel]) -> pd.DataFrame:
+    def apply_filter_component(self, df: pd.DataFrame, component: FilterComponent) -> pd.DataFrame:
         """
-        Tüm filtreleri sırayla uygular (AND mantığı).
+        Composite Pattern ile filtreleme.
+        FilterModel veya FilterGroup kabul eder.
         
         Args:
             df: Filtrelenecek DataFrame
-            filters: Uygulanacak filtreler
+            component: FilterModel veya FilterGroup
             
         Returns:
             Filtrelenmiş DataFrame
         """
-        if not filters:
+        if component is None or component.is_empty():
             return df
         
-        result = df.copy()
+        mask = self._get_component_mask(df, component)
+        return df[mask]
+    
+    def _get_component_mask(self, df: pd.DataFrame, component: FilterComponent) -> pd.Series:
+        """
+        Herhangi bir FilterComponent için boolean mask döndürür.
+        Rekürsif olarak çalışır.
+        """
+        if isinstance(component, FilterModel):
+            if component.column_name not in df.columns:
+                # Sütun yoksa tümünü dahil et
+                return pd.Series([True] * len(df), index=df.index)
+            return self._apply_filter(df, component)
         
-        for filter_model in filters:
-            if filter_model.column_name not in result.columns:
-                continue
+        elif isinstance(component, FilterGroup):
+            return self._get_group_mask(df, component)
+        
+        else:
+            raise ValueError(f"Desteklenmeyen bileşen tipi: {type(component)}")
+    
+    def _get_group_mask(self, df: pd.DataFrame, group: FilterGroup) -> pd.Series:
+        """
+        FilterGroup için boolean mask döndürür.
+        Her eleman çifti arasındaki operatöre göre maskeleri birleştirir.
+        """
+        if group.items.is_empty():
+            # Boş grup - tümünü dahil et
+            return pd.Series([True] * len(df), index=df.index)
+        
+        # İlk elemanın mask'ı ile başla
+        first_item = group.items[0]
+        result = self._get_component_mask(df, first_item.component)
+        
+        # Sonraki elemanları operatörlerine göre birleştir
+        for item in list(group.items)[1:]:
+            child_mask = self._get_component_mask(df, item.component)
+            op = item.preceding_operator or LogicalOperator.AND
             
-            mask = self._apply_filter(result, filter_model)
-            result = result[mask]
+            if op == LogicalOperator.AND:
+                result = result & child_mask
+            else:  # OR
+                result = result | child_mask
         
         return result
     
@@ -156,10 +195,9 @@ class FilterEngine:
     def _apply_is_not_null(self, df: pd.DataFrame, f: FilterModel) -> pd.Series:
         return df[f.column_name].notna()
     
-    def get_filter_summary(self, filters: List[FilterModel]) -> str:
-        """Filtre özetini string olarak döndürür"""
-        if not filters:
+    def get_component_summary(self, component: FilterComponent) -> str:
+        """Filtre bileşeni özetini string olarak döndürür"""
+        if component is None or component.is_empty():
             return "Filtre yok"
         
-        summaries = [f.to_display_string() for f in filters]
-        return " VE ".join(summaries)
+        return component.to_display_string()

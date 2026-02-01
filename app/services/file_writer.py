@@ -114,32 +114,64 @@ class FileWriterFactory:
             extensions.extend(strategy.supported_extensions)
         return extensions
 
-    def get_format_descriptors(self) -> list[dict]:
-        """Her strateji için UI'da kullanılabilecek gösterim bilgilerini döndürür.
-
-        Dönen öğe sözlükleri şu anahtarları içerir:
-        - name: Kullanıcıya gösterilecek metin
-        - filter: QFileDialog için filtre metni
-        - default: Önerilen dosya uzantısı (örn. '.csv')
+    def _build_descriptor(self, strategy: FileWriterStrategy) -> Optional[dict]:
+        """Tek bir strateji için descriptor oluşturur (SRP).
+        
+        Returns:
+            Descriptor dict veya None (uzantı yoksa)
         """
-        descriptors: list[dict] = []
+        exts = [e.lower() for e in strategy.supported_extensions]
+        if not exts:
+            return None
+        
+        patterns = ';'.join(f'*{e}' for e in exts)
+        
+        return {
+            'name': f"{', '.join(exts)}",
+            'filter': f"{strategy.__class__.__name__} ({patterns})",
+            'default': exts[0],
+            'extensions': exts,
+        }
+    
+    def get_format_descriptors(self) -> list[dict]:
+        """Tüm stratejiler için UI descriptor listesi döndürür.
+        
+        Returns:
+            Her biri name, filter, default, extensions içeren dict listesi
+        """
+        descriptors = []
         for strategy in self._strategies:
-            exts = [e.lower() for e in strategy.supported_extensions]
-            if not exts:
-                continue
-
-            # Genel, genişletilebilir gösterim oluştur
-            # Örnek: "WriterName (*.ext1;*.ext2)" ve QFileDialog filtresi olarak "*.ext1;*.ext2"
-            patterns = ';'.join(f'*{e}' for e in exts)
-            # Kullanıcıya gösterilecek isimde strateji sınıf adını ve uzantıları listeliyoruz
-            name = f"{', '.join(exts)}"
-            file_filter = f"{strategy.__class__.__name__} ({patterns})"
-            default = exts[0]
-
-            descriptors.append({
-                'name': name,
-                'filter': file_filter,
-                'default': default,
-            })
-
+            desc = self._build_descriptor(strategy)
+            if desc:
+                descriptors.append(desc)
         return descriptors
+    
+    def get_descriptor_by_extension(self, extension: str) -> Optional[dict]:
+        """Verilen uzantı için uygun descriptor'ı döndürür.
+        
+        Args:
+            extension: Dosya uzantısı (örn. 'csv', '.csv', 'xlsx')
+            
+        Returns:
+            Descriptor dict veya None (desteklenmiyorsa)
+        """
+        # Uzantıyı normalize et (.csv -> csv)
+        ext = extension.lower().lstrip('.')
+        
+        for strategy in self._strategies:
+            strategy_exts = [e.lower().lstrip('.') for e in strategy.supported_extensions]
+            if ext in strategy_exts:
+                return self._build_descriptor(strategy)
+        
+        return None
+    
+    def is_extension_supported(self, extension: str) -> bool:
+        """Verilen uzantının desteklenip desteklenmediğini kontrol eder.
+        
+        Args:
+            extension: Dosya uzantısı (örn. 'csv', '.csv')
+            
+        Returns:
+            True eğer destekleniyorsa
+        """
+        return self.get_descriptor_by_extension(extension) is not None

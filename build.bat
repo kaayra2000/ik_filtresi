@@ -26,6 +26,15 @@ if %ERRORLEVEL% neq 0 (
     )
 )
 
+:: Versiyon bilgisi (arguman olarak alinir veya varsayilan kullanilir)
+set "VERSION=%~1"
+if "%VERSION%"=="" set "VERSION=dev"
+echo [INFO] Versiyon: %VERSION%
+
+:: Versiyon dosyasi olustur
+echo %VERSION%> version.txt
+echo [INFO] version.txt olusturuldu
+
 :: Önceki build'i temizle
 echo [INFO] Onceki build dosyalari temizleniyor...
 if exist "build" rmdir /s /q "build"
