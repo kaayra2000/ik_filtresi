@@ -17,7 +17,7 @@ from app.services.data_analyzer import DataAnalyzer
 from app.services.filter_engine import FilterEngine
 from app.services.filter_persistence import FilterPersistence
 from app.models.column_info import ColumnInfo
-from app.models.filter_model import FilterModel
+from app.models.filter_model import FilterGroup
 from app.ui.column_info_widget import ColumnInfoWidget
 from app.ui.filter_widget import FilterWidget
 from app.ui.data_table_widget import DataTableWidget
@@ -198,7 +198,7 @@ class MainWindow(QMainWindow):
         
         add_filter = QAction("Filtre &Ekle", self)
         add_filter.setShortcut("Ctrl+F")
-        add_filter.triggered.connect(self._filter_widget._add_filter)
+        add_filter.triggered.connect(self._add_filter_from_menu)
         filter_menu.addAction(add_filter)
         
         clear_filters = QAction("Filtreleri &Temizle", self)
@@ -215,7 +215,7 @@ class MainWindow(QMainWindow):
     
     def _connect_signals(self):
         """Sinyalleri bağlar"""
-        self._filter_widget.filters_changed.connect(self._apply_filters)
+        self._filter_widget.filter_group_changed.connect(self._apply_filter_group)
     
     def _prompt_file_selection(self):
         """Dosya seçim dialogunu gösterir"""
@@ -261,17 +261,16 @@ class MainWindow(QMainWindow):
         # Widget'ları güncelle
         self._column_info_widget.set_column_infos(column_infos)
         self._filter_widget.set_column_infos(column_infos)
-        # Load saved filters if compatible with this file
-        saved_filters = self._filter_persistence.load_filters()
-        if saved_filters and self._filter_persistence.is_compatible(saved_filters, column_infos):
-            # ensure table has original df set, then set and apply filters
+        
+        # Kaydedilmiş filtreleri yükle
+        saved_group = self._filter_persistence.load_filter_group()
+        if saved_group and not saved_group.is_empty():
+            # Tabloyu ayarla
             self._data_table_widget.set_dataframe(df)
-            self._filter_widget.set_filters(saved_filters)
+            # Filtreleri yükle ve uygula
+            self._filter_widget.set_filter_group(saved_group)
+            self._apply_filter_group(saved_group)
             self._status_bar.showMessage("Kayıtlı filtreler yüklendi ve uygulandı.")
-        elif saved_filters:
-            # There are saved filters but not compatible
-            self._data_table_widget.set_dataframe(df)
-            self._status_bar.showMessage("Kayıtlı filtre bulundu ancak bu dosyayla uyumlu değil. Filtreler yüklenmedi.")
         else:
             self._data_table_widget.set_dataframe(df)
             self._status_bar.showMessage(
@@ -290,25 +289,25 @@ class MainWindow(QMainWindow):
         
         self._status_bar.showMessage("Yükleme başarısız")
     
-    def _apply_filters(self, filters: List[FilterModel]):
-        """Filtreleri uygular"""
+    def _apply_filter_group(self, group: FilterGroup):
+        """FilterGroup ile filtreleme (AND/OR destekli)"""
         if self._df is None:
             return
         
-        if not filters:
+        if group is None or group.is_empty():
             self._data_table_widget.reset_to_original()
             self._status_bar.showMessage("Filtreler temizlendi")
             return
         
         try:
-            filtered_df = self._filter_engine.apply_filters(self._df, filters)
+            filtered_df = self._filter_engine.apply_filter_component(self._df, group)
             self._data_table_widget.set_filtered_dataframe(filtered_df)
             
-            summary = self._filter_engine.get_filter_summary(filters)
+            summary = self._filter_engine.get_component_summary(group)
             self._status_bar.showMessage(
                 f"Filtre uygulandı: {len(filtered_df)} sonuç | {summary}"
             )
-            self._filter_persistence.save_filters(filters)
+            self._filter_persistence.save_filter_group(group)
         except Exception as e:
             QMessageBox.warning(
                 self,
@@ -322,6 +321,11 @@ class MainWindow(QMainWindow):
         if self._df is not None:
             self._data_table_widget.reset_to_original()
         self._status_bar.showMessage("Filtreler temizlendi")
+    
+    def _add_filter_from_menu(self):
+        """Menüden filtre ekle"""
+        if self._filter_widget._root_group:
+            self._filter_widget._root_group._add_filter()
     
     def _show_about(self):
         """Hakkında dialogu"""

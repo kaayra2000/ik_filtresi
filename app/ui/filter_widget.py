@@ -1,13 +1,17 @@
 """
 Filtre widget'ı - Filtreleme arayüzü
+
+Composite Pattern kullanılarak hiyerarşik filtre yapısı desteklenir.
+Filtreler ve Filtre Grupları rekürsif olarak eklenebilir.
 """
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QToolButton,
     QComboBox, QLineEdit, QFrame, QScrollArea, QDateEdit,
-    QDoubleSpinBox, QMessageBox, QCheckBox
+    QDoubleSpinBox, QMessageBox, QCheckBox, QSizePolicy,
+    QDialog, QDialogButtonBox
 )
 from PyQt6.QtWidgets import QFileDialog, QGridLayout
-from PyQt6.QtCore import pyqtSignal, QDate, QSize
+from PyQt6.QtCore import pyqtSignal, QDate, QSize, Qt
 from PyQt6.QtGui import QIcon, QPixmap
 from pathlib import Path
 from app.ui.icon_factory import IconFactory
@@ -15,7 +19,10 @@ from typing import List, Optional, Any
 from datetime import datetime
 
 from app.models.column_info import ColumnInfo, ColumnType
-from app.models.filter_model import FilterModel, FilterOperator
+from app.models.filter_model import (
+    FilterModel, FilterOperator, FilterGroup, 
+    FilterComponent, LogicalOperator, component_from_dict
+)
 from app.services.filter_persistence import FilterPersistence
 
 
@@ -422,210 +429,693 @@ class SingleFilterWidget(QFrame):
                 self._current_input.edit.setText(str(val))
 
 
-class FilterWidget(QWidget):
+class FilterGroupWidget(QFrame):
     """
-    Filtre yönetimi widget'ı.
-    Birden fazla filtre eklenmesini ve yönetilmesini sağlar.
+    Composite Pattern - Bir filtre grubunu temsil eden widget.
+    
+    İçinde:
+    - Mantıksal operatör seçici (AND/OR)
+    - Filtre widget'ları (SingleFilterWidget)
+    - Alt grup widget'ları (FilterGroupWidget - rekürsif)
+    
+    Bu yapı rekürsif olarak çalışır ve karmaşık filtre ifadeleri oluşturmayı sağlar:
+    Örnek: (A OR B) AND (C OR D)
     """
     
-    filters_changed = pyqtSignal(list)  # List[FilterModel]
+    removed = pyqtSignal(object)  # self'i emit eder
+    changed = pyqtSignal()
     
-    def __init__(self, parent=None):
+    # Renk şeması - derinliğe göre farklı renkler
+    GROUP_COLORS = [
+        "#e3f2fd",  # Mavi - depth 0
+        "#fff3e0",  # Turuncu - depth 1  
+        "#e8f5e9",  # Yeşil - depth 2
+        "#fce4ec",  # Pembe - depth 3
+        "#f3e5f5",  # Mor - depth 4
+    ]
+    
+    def __init__(self, column_infos: List[ColumnInfo], depth: int = 0, 
+                 parent_widget: Optional['FilterGroupWidget'] = None, parent=None):
         super().__init__(parent)
-        self._column_infos: List[ColumnInfo] = []
-        self._filter_widgets: List[SingleFilterWidget] = []
+        self._column_infos = column_infos
+        self._depth = depth
+        self._parent_widget = parent_widget
+        self._children: List[QWidget] = []  # SingleFilterWidget veya FilterGroupWidget
+        self._operator_combos: List[QComboBox] = []  # Her çocuk için önceki operatör (ilk hariç)
+        self._group_id = None  # FilterGroup için ID
         self._setup_ui()
     
     def _setup_ui(self):
+        self.setObjectName("filterGroupFrame")
+        self.setFrameShape(QFrame.Shape.StyledPanel)
+        
+        # Derinliğe göre arka plan rengi
+        color_index = self._depth % len(self.GROUP_COLORS)
+        self.setStyleSheet(f"""
+            QFrame#filterGroupFrame {{
+                background-color: {self.GROUP_COLORS[color_index]};
+                border: 2px solid #90a4ae;
+                border-radius: 8px;
+                margin: 4px;
+                padding: 8px;
+            }}
+        """)
+        
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(8)
+        main_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Başlık ve ekle butonu
+        # Üst bar - grup başlığı ve butonlar
         header_layout = QHBoxLayout()
+        header_layout.setSpacing(8)
         
-        title = QLabel("🔍 Filtreler")
-        title.setObjectName("sectionLabel")
-        header_layout.addWidget(title)
+        # Grup etiketi
+        depth_label = QLabel(f"📁 Grup (Seviye {self._depth})")
+        depth_label.setStyleSheet("font-weight: bold; color: #37474f;")
+        header_layout.addWidget(depth_label)
         
         header_layout.addStretch()
         
-        self._add_btn = IconFactory.create_tool_button("add_filter.svg", "Filtre Ekle")
-        self._add_btn.setObjectName("addFilterButton")
-        self._add_btn.setEnabled(False)
-        self._add_btn.clicked.connect(self._add_filter)
-        header_layout.addWidget(self._add_btn)
+        # Filtre ekle butonu
+        add_filter_btn = IconFactory.create_tool_button("add_filter.svg", "Filtre Ekle")
+        add_filter_btn.setToolTip("Bu gruba yeni bir filtre ekle")
+        add_filter_btn.clicked.connect(self._add_filter)
+        header_layout.addWidget(add_filter_btn)
+        
+        # Alt grup ekle butonu
+        add_group_btn = IconFactory.create_tool_button("add_group.svg", "Grup Ekle")
+        add_group_btn.setToolTip("Bu gruba yeni bir alt grup ekle")
+        add_group_btn.clicked.connect(self._add_group)
+        header_layout.addWidget(add_group_btn)
+        
+        # Grubu kaldır butonu (kök grup hariç)
+        if self._depth > 0:
+            remove_btn = IconFactory.create_tool_button("remove.svg", "Grubu Kaldır")
+            remove_btn.setToolTip("Bu grubu kaldır")
+            remove_btn.setObjectName("removeButton")
+            remove_btn.clicked.connect(lambda: self.removed.emit(self))
+            header_layout.addWidget(remove_btn)
         
         main_layout.addLayout(header_layout)
         
-        # Scroll area for filters
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setMaximumHeight(300)
+        # Ayırıcı çizgi
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setStyleSheet("background-color: #90a4ae;")
+        main_layout.addWidget(separator)
         
-        self._filters_container = QWidget()
-        self._filters_layout = QVBoxLayout(self._filters_container)
-        self._filters_layout.setSpacing(10)
-        self._filters_layout.addStretch()
+        # Çocuk elemanlar için container
+        self._children_container = QWidget()
+        self._children_layout = QVBoxLayout(self._children_container)
+        self._children_layout.setSpacing(4)
+        self._children_layout.setContentsMargins(0, 0, 0, 0)
+        self._children_layout.addStretch()
         
-        scroll.setWidget(self._filters_container)
-        main_layout.addWidget(scroll)
-        
-        # Filtreleri uygula butonu (buttons wrapped in a container for targeted styling)
-        lower_button_container = QWidget()
-        lower_button_layout = QGridLayout(lower_button_container)
-        lower_button_layout.setContentsMargins(0, 0, 0, 0)
-        lower_button_layout.setHorizontalSpacing(8)
-        lower_button_layout.setVerticalSpacing(6)
-
-        # Save / Load buttons moved here to avoid header overflow
-        self._save_btn = IconFactory.create_tool_button("save_filters.svg", "Filtreleri Kaydet")
-        self._save_btn.setObjectName("saveFilterButton")
-        self._save_btn.setEnabled(False)
-        self._save_btn.clicked.connect(self._save_filters_to_file)
-        # Arrange buttons in 2x2 grid: (0,0) save, (0,1) load, (1,0) clear, (1,1) apply
-        lower_button_layout.addWidget(self._save_btn, 0, 0)
-
-        self._load_btn = IconFactory.create_tool_button("load_from_file.svg", "Dosyadan Yükle")
-        self._load_btn.setObjectName("loadFilterButton")
-        self._load_btn.setEnabled(True)
-        self._load_btn.clicked.connect(self._load_filters_from_file)
-        lower_button_layout.addWidget(self._load_btn, 0, 1)
-
-        self._clear_btn = IconFactory.create_tool_button("clear.svg", "Temizle")
-        self._clear_btn.setObjectName("dangerButton")
-        self._clear_btn.clicked.connect(self._clear_filters)
-        lower_button_layout.addWidget(self._clear_btn, 1, 0)
-
-        self._apply_btn = IconFactory.create_tool_button("apply_filters.svg", "Filtreleri Uygula")
-        self._apply_btn.setObjectName("primaryButton")
-        self._apply_btn.clicked.connect(self._apply_filters)
-        lower_button_layout.addWidget(self._apply_btn, 1, 1)
-        main_layout.addWidget(lower_button_container)
+        main_layout.addWidget(self._children_container)
     
-    def set_column_infos(self, column_infos: List[ColumnInfo]):
-        """Sütun bilgilerini günceller"""
-        self._column_infos = column_infos
-        self._add_btn.setEnabled(len(column_infos) > 0)
-        # enable save when we have column info (so saved filters can be validated on load)
-        try:
-            self._save_btn.setEnabled(len(column_infos) > 0)
-        except Exception:
-            pass
-        self._clear_filters()
+    def _create_operator_combo(self) -> QComboBox:
+        """Operatör seçici oluşturur"""
+        combo = QComboBox()
+        combo.setFixedWidth(80)
+        combo.addItem("VE", LogicalOperator.AND)
+        combo.addItem("VEYA", LogicalOperator.OR)
+        combo.setCurrentIndex(0)  # Varsayılan: VE
+        combo.setToolTip("Bu filtreyi öncekiyle birleştirme mantığı")
+        combo.currentIndexChanged.connect(self._on_operator_changed)
+        combo.setStyleSheet("""
+            QComboBox {
+                background-color: #fff8e1;
+                border: 2px solid #ffc107;
+                border-radius: 4px;
+                padding: 4px 8px;
+                font-weight: bold;
+                color: #f57c00;
+            }
+            QComboBox:hover {
+                border-color: #ff9800;
+            }
+        """)
+        return combo
+    
+    def _create_operator_row(self) -> QWidget:
+        """Operatör satırı oluşturur (VE/VEYA seçici)"""
+        row = QWidget()
+        row_layout = QHBoxLayout(row)
+        row_layout.setContentsMargins(20, 2, 20, 2)
+        row_layout.setSpacing(8)
+        
+        # Sol çizgi
+        left_line = QFrame()
+        left_line.setFrameShape(QFrame.Shape.HLine)
+        left_line.setStyleSheet("background-color: #ffc107;")
+        left_line.setFixedHeight(2)
+        row_layout.addWidget(left_line, 1)
+        
+        # Operatör combo
+        combo = self._create_operator_combo()
+        row_layout.addWidget(combo)
+        
+        # Sağ çizgi
+        right_line = QFrame()
+        right_line.setFrameShape(QFrame.Shape.HLine)
+        right_line.setStyleSheet("background-color: #ffc107;")
+        right_line.setFixedHeight(2)
+        row_layout.addWidget(right_line, 1)
+        
+        row.operator_combo = combo
+        return row
+    
+    def _on_operator_changed(self, index: int):
+        """Operatör değiştiğinde"""
+        self.changed.emit()
     
     def _add_filter(self):
         """Yeni filtre ekler"""
         if not self._column_infos:
             return
         
-        filter_widget = SingleFilterWidget(self._column_infos)
-        filter_widget.removed.connect(self._remove_filter)
-        filter_widget.changed.connect(self._on_filter_changed)
+        # İlk eleman değilse önce operatör satırı ekle
+        operator_row = None
+        if self._children:
+            operator_row = self._create_operator_row()
+            self._operator_combos.append(operator_row.operator_combo)
+            self._children_layout.insertWidget(self._children_layout.count() - 1, operator_row)
         
-        self._filter_widgets.append(filter_widget)
-        self._filters_layout.insertWidget(self._filters_layout.count() - 1, filter_widget)
+        # Filtre widget'ı
+        filter_widget = SingleFilterWidget(self._column_infos)
+        filter_widget.removed.connect(lambda w: self._remove_child(filter_widget, operator_row))
+        filter_widget.changed.connect(self._on_child_changed)
+        
+        # Container tuple olarak sakla (widget, operator_row)
+        container = QWidget()
+        container.filter_widget = filter_widget
+        container.operator_row = operator_row
+        
+        self._children.append(container)
+        self._children_layout.insertWidget(self._children_layout.count() - 1, filter_widget)
+        self.changed.emit()
     
-    def _remove_filter(self, widget: SingleFilterWidget):
-        """Filtreyi kaldırır"""
-        if widget in self._filter_widgets:
-            self._filter_widgets.remove(widget)
-            widget.deleteLater()
-            self._on_filter_changed()
+    def _add_group(self):
+        """Yeni alt grup ekler"""
+        if not self._column_infos:
+            return
+        
+        # İlk eleman değilse önce operatör satırı ekle
+        operator_row = None
+        if self._children:
+            operator_row = self._create_operator_row()
+            self._operator_combos.append(operator_row.operator_combo)
+            self._children_layout.insertWidget(self._children_layout.count() - 1, operator_row)
+        
+        # Grup widget'ı
+        group_widget = FilterGroupWidget(
+            self._column_infos, 
+            depth=self._depth + 1,
+            parent_widget=self
+        )
+        group_widget.removed.connect(lambda w: self._remove_child(group_widget, operator_row))
+        group_widget.changed.connect(self._on_child_changed)
+        
+        # Container tuple olarak sakla
+        container = QWidget()
+        container.filter_widget = group_widget
+        container.operator_row = operator_row
+        
+        self._children.append(container)
+        self._children_layout.insertWidget(self._children_layout.count() - 1, group_widget)
+        self.changed.emit()
+    
+    def _remove_child(self, widget: QWidget, operator_row: Optional[QWidget]):
+        """Çocuk elemanı kaldırır"""
+        # Container'ı bul
+        container_to_remove = None
+        idx = -1
+        for i, container in enumerate(self._children):
+            if container.filter_widget == widget:
+                container_to_remove = container
+                idx = i
+                break
+        
+        if container_to_remove is None:
+            return
+        
+        self._children.remove(container_to_remove)
+        
+        # Operatör satırını kaldır
+        if operator_row:
+            if operator_row.operator_combo in self._operator_combos:
+                self._operator_combos.remove(operator_row.operator_combo)
+            operator_row.deleteLater()
+        
+        # Widget'ı kaldır
+        widget.deleteLater()
+        
+        # İlk eleman kaldırıldıysa ve başka eleman varsa, yeni ilk elemanın operatör satırını kaldır
+        if idx == 0 and self._children:
+            first_container = self._children[0]
+            if first_container.operator_row:
+                if first_container.operator_row.operator_combo in self._operator_combos:
+                    self._operator_combos.remove(first_container.operator_row.operator_combo)
+                first_container.operator_row.deleteLater()
+                first_container.operator_row = None
+        
+        self.changed.emit()
+    
+    def _on_child_changed(self):
+        """Çocuk değiştiğinde"""
+        self.changed.emit()
+    
+    def clear(self):
+        """Tüm çocukları temizler"""
+        # Önce tüm widget'ları ve operatör satırlarını kaldır
+        for i in range(self._children_layout.count() - 1, -1, -1):
+            item = self._children_layout.itemAt(i)
+            if item and item.widget():
+                widget = item.widget()
+                self._children_layout.removeWidget(widget)
+                widget.deleteLater()
+        
+        self._children.clear()
+        self._operator_combos.clear()
+        
+        # Stretch'i yeniden ekle
+        self._children_layout.addStretch()
+        self.changed.emit()
+    
+    def get_filter_group(self) -> FilterGroup:
+        """
+        Bu widget'tan FilterGroup modeli oluşturur.
+        Rekürsif olarak tüm çocukları toplar.
+        """
+        group = FilterGroup(id=self._group_id or "")
+        
+        for i, container in enumerate(self._children):
+            child_widget = container.filter_widget
+            
+            # Operatörü al (ilk eleman hariç)
+            operator = LogicalOperator.AND
+            if i > 0 and container.operator_row and container.operator_row.operator_combo:
+                operator = container.operator_row.operator_combo.currentData()
+            
+            if isinstance(child_widget, SingleFilterWidget):
+                filter_model = child_widget.get_filter_model()
+                if filter_model is not None:
+                    group.add(filter_model, operator)
+            elif isinstance(child_widget, FilterGroupWidget):
+                child_group = child_widget.get_filter_group()
+                if not child_group.is_empty():
+                    group.add(child_group, operator)
+        
+        return group
+    
+    def apply_filter_group(self, group: FilterGroup):
+        """
+        FilterGroup modelinden widget durumunu ayarlar.
+        """
+        self.clear()
+        
+        self._group_id = group.id
+        
+        # Çocukları ekle (FilterItems üzerinden iterasyon)
+        for i, item in enumerate(group.items):
+            child = item.component
+            operator = item.preceding_operator or LogicalOperator.AND
+            
+            if isinstance(child, FilterModel):
+                # İlk eleman değilse operatör satırı ekle
+                operator_row = None
+                if self._children:
+                    operator_row = self._create_operator_row()
+                    # Operatörü ayarla
+                    for j in range(operator_row.operator_combo.count()):
+                        if operator_row.operator_combo.itemData(j) == operator:
+                            operator_row.operator_combo.setCurrentIndex(j)
+                            break
+                    self._operator_combos.append(operator_row.operator_combo)
+                    self._children_layout.insertWidget(self._children_layout.count() - 1, operator_row)
+                
+                filter_widget = SingleFilterWidget(self._column_infos)
+                filter_widget.removed.connect(lambda w, op_row=operator_row: self._remove_child(w, op_row))
+                filter_widget.changed.connect(self._on_child_changed)
+                
+                container = QWidget()
+                container.filter_widget = filter_widget
+                container.operator_row = operator_row
+                
+                self._children.append(container)
+                self._children_layout.insertWidget(self._children_layout.count() - 1, filter_widget)
+                filter_widget.apply_filter_model(child)
+                
+            elif isinstance(child, FilterGroup):
+                # İlk eleman değilse operatör satırı ekle
+                operator_row = None
+                if self._children:
+                    operator_row = self._create_operator_row()
+                    # Operatörü ayarla
+                    for j in range(operator_row.operator_combo.count()):
+                        if operator_row.operator_combo.itemData(j) == operator:
+                            operator_row.operator_combo.setCurrentIndex(j)
+                            break
+                    self._operator_combos.append(operator_row.operator_combo)
+                    self._children_layout.insertWidget(self._children_layout.count() - 1, operator_row)
+                
+                group_widget = FilterGroupWidget(
+                    self._column_infos,
+                    depth=self._depth + 1,
+                    parent_widget=self
+                )
+                group_widget.removed.connect(lambda w, op_row=operator_row: self._remove_child(w, op_row))
+                group_widget.changed.connect(self._on_child_changed)
+                
+                container = QWidget()
+                container.filter_widget = group_widget
+                container.operator_row = operator_row
+                
+                self._children.append(container)
+                self._children_layout.insertWidget(self._children_layout.count() - 1, group_widget)
+                group_widget.apply_filter_group(child)
+    
+    def get_display_string(self) -> str:
+        """Filtre grubunun görüntüleme metnini döndürür"""
+        group = self.get_filter_group()
+        return group.to_display_string()
+
+
+class FilterDialog(QDialog):
+    """
+    Modal filtre düzenleme penceresi.
+    
+    Ana pencereden bağımsız açılır ve modal olarak çalışır
+    (açıkken ana pencereyle etkileşim engellenir).
+    """
+    
+    SUMMARY_MAX_LENGTH = 120  # Özet için maksimum karakter
+    
+    def __init__(self, column_infos: List[ColumnInfo], current_group: Optional[FilterGroup] = None, parent=None):
+        super().__init__(parent)
+        self._column_infos = column_infos
+        self._initial_group = current_group
+        self._root_group: Optional[FilterGroupWidget] = None
+        self._result_group: Optional[FilterGroup] = None
+        
+        self.setWindowTitle("🔍 Filtre Düzenleyici")
+        self.setModal(True)  # Modal dialog - ana pencere ile etkileşim engellenir
+        self.setMinimumSize(700, 500)
+        self.resize(800, 600)
+        
+        self._setup_ui()
+        self._create_root_group()
+        
+        # Mevcut filtreleri yükle
+        if current_group and not current_group.is_empty():
+            self._root_group.apply_filter_group(current_group)
+        
+        self._update_summary()
+    
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(12)
+        
+        # Scroll area for filter groups
+        self._scroll = QScrollArea()
+        self._scroll.setWidgetResizable(True)
+        self._scroll.setObjectName("filterScrollArea")
+        
+        self._scroll_content = QWidget()
+        self._scroll_layout = QVBoxLayout(self._scroll_content)
+        self._scroll_layout.setContentsMargins(5, 5, 5, 5)
+        self._scroll_layout.addStretch()
+        
+        self._scroll.setWidget(self._scroll_content)
+        layout.addWidget(self._scroll)
+        
+        self._summary_label = QLabel("Henüz filtre eklenmedi")
+        self._summary_label.setObjectName("summaryContent")
+        self._summary_label.setWordWrap(True)
+        
+        layout.addWidget(self._summary_label)
+        
+        # Alt butonlar
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(8)
+        
+        # Kaydet butonu
+        self._save_btn = IconFactory.create_tool_button("save_filters.svg", "Kaydet")
+        self._save_btn.setObjectName("saveFilterButton")
+        self._save_btn.setToolTip("Mevcut filtreleri JSON dosyasına kaydet")
+        self._save_btn.clicked.connect(self._save_filters_to_file)
+        button_layout.addWidget(self._save_btn)
+
+        # Yükle butonu
+        self._load_btn = IconFactory.create_tool_button("load_from_file.svg", "Yükle")
+        self._load_btn.setObjectName("loadFilterButton")
+        self._load_btn.setToolTip("JSON dosyasından filtre yükle")
+        self._load_btn.clicked.connect(self._load_filters_from_file)
+        button_layout.addWidget(self._load_btn)
+
+        # Temizle butonu
+        self._clear_btn = IconFactory.create_tool_button("clear.svg", "Temizle")
+        self._clear_btn.setObjectName("dangerButton")
+        self._clear_btn.setToolTip("Tüm filtreleri temizle")
+        self._clear_btn.clicked.connect(self._clear_filters)
+        button_layout.addWidget(self._clear_btn)
+        
+        button_layout.addStretch()
+        
+        # İptal butonu
+        self._cancel_btn = IconFactory.create_tool_button("clear.svg", "İptal")
+        self._cancel_btn.setToolTip("Değişiklikleri iptal et")
+        self._cancel_btn.clicked.connect(self.reject)
+        button_layout.addWidget(self._cancel_btn)
+
+        # Uygula butonu
+        self._apply_btn = IconFactory.create_tool_button("apply_filters.svg", "Filtreleri Uygula")
+        self._apply_btn.setObjectName("primaryButton")
+        self._apply_btn.setToolTip("Filtreleri uygula ve pencereyi kapat")
+        self._apply_btn.clicked.connect(self._apply_and_close)
+        button_layout.addWidget(self._apply_btn)
+        
+        layout.addLayout(button_layout)
+    
+    def _update_summary(self):
+        """Filtre özetini günceller"""
+        if not self._root_group:
+            summary = "Henüz filtre eklenmedi"
+        else:
+            group = self._root_group.get_filter_group()
+            if group.is_empty():
+                summary = "Henüz filtre eklenmedi"
+            else:
+                summary = group.to_display_string()
+        
+        # Özeti kısalt ve tooltip ekle
+        self._summary_label.setText(summary[:self.SUMMARY_MAX_LENGTH] + "...") if len(summary) > self.SUMMARY_MAX_LENGTH else self._summary_label.setText(summary)
+        self._summary_label.setToolTip(summary)
+        
+    
+    def _create_root_group(self):
+        """Kök filtre grubunu oluşturur"""
+        if self._root_group:
+            self._root_group.deleteLater()
+        
+        if not self._column_infos:
+            self._root_group = None
+            return
+        
+        self._root_group = FilterGroupWidget(self._column_infos, depth=0)
+        self._root_group.changed.connect(self._update_summary)
+        self._scroll_layout.insertWidget(0, self._root_group)
     
     def _clear_filters(self):
         """Tüm filtreleri temizler"""
-        for widget in self._filter_widgets:
-            widget.deleteLater()
-        self._filter_widgets.clear()
-        self.filters_changed.emit([])
-
-    def add_filter_from_model(self, filter_model: FilterModel):
-        """Add a filter widget and populate it from FilterModel"""
-        widget = SingleFilterWidget(self._column_infos)
-        widget.removed.connect(self._remove_filter)
-        widget.changed.connect(self._on_filter_changed)
-        self._filter_widgets.append(widget)
-        self._filters_layout.insertWidget(self._filters_layout.count() - 1, widget)
-        # Apply model after insertion (so comboboxes are ready)
-        widget.apply_filter_model(filter_model)
-        self._on_filter_changed()
-
-    def set_filters(self, filters: List[FilterModel]):
-        """Replace existing filters with provided list"""
-        self._clear_filters()
-        for f in filters:
-            self.add_filter_from_model(f)
-        # Emit change with current filters
-        self.filters_changed.emit(self.get_filters())
+        if self._root_group:
+            self._root_group.clear()
+        self._update_summary()
     
-    def _on_filter_changed(self):
-        """Herhangi bir filtre değiştiğinde çağrılır"""
-        pass  # Otomatik uygulama istenirse burada yapılabilir
+    def _apply_and_close(self):
+        """Filtreleri uygula ve pencereyi kapat"""
+        if self._root_group:
+            self._result_group = self._root_group.get_filter_group()
+        else:
+            self._result_group = FilterGroup()
+        self.accept()
     
-    def _apply_filters(self):
-        """Filtreleri uygular"""
-        filters = self.get_filters()
-        self.filters_changed.emit(filters)
+    def get_filter_group(self) -> FilterGroup:
+        """Sonuç filtre grubunu döndürür"""
+        return self._result_group if self._result_group else FilterGroup()
     
-    def get_filters(self) -> List[FilterModel]:
-        """Tüm geçerli filtreleri döndürür"""
-        filters = []
-        for widget in self._filter_widgets:
-            filter_model = widget.get_filter_model()
-            if filter_model is not None:
-                filters.append(filter_model)
-        return filters
-
     def _save_filters_to_file(self):
-        """Save current filters to a user-selected JSON file."""
-        if not self._column_infos:
-            QMessageBox.warning(self, "Kaydetme Hatası", "Önce sütun bilgileri yüklenmeli.")
-            return
-        path, _ = QFileDialog.getSaveFileName(self, "Filtreleri Kaydet", filter="JSON dosyaları (*.json);;Tüm dosyalar (*)")
+        """Filtreleri JSON dosyasına kaydet"""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Filtreleri Kaydet", 
+            filter="JSON dosyaları (*.json);;Tüm dosyalar (*)"
+        )
         if not path:
             return
+        
         try:
             persistence = FilterPersistence(path=path)
-            persistence.save_filters(self.get_filters())
-            QMessageBox.information(self, "Kaydedildi", f"Filtreler kaydedildi: {path}")
+            group = self._root_group.get_filter_group() if self._root_group else FilterGroup()
+            persistence.save_filter_group(group)
+            QMessageBox.information(self, "Kaydedildi", f"Filtreler kaydedildi:\n{path}")
         except Exception as e:
             QMessageBox.critical(self, "Kaydetme Hatası", f"Filtre kaydedilirken hata oluştu:\n{e}")
 
     def _load_filters_from_file(self):
-        """Load filters from a JSON file. If incompatible, warn the user and ask to continue."""
-        path, _ = QFileDialog.getOpenFileName(self, "Filtre Dosyası Seçin", filter="JSON dosyaları (*.json);;Tüm dosyalar (*)")
+        """JSON dosyasından filtre yükle"""
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Filtre Dosyası Seçin", 
+            filter="JSON dosyaları (*.json);;Tüm dosyalar (*)"
+        )
         if not path:
             return
+        
         try:
             persistence = FilterPersistence(path=path)
-            loaded = persistence.load_filters()
+            group = persistence.load_filter_group()
+            
+            if group is None or group.is_empty():
+                QMessageBox.warning(self, "Yükleme", "Dosyada geçerli filtre bulunamadı.")
+                return
+            
+            if self._root_group:
+                self._root_group.apply_filter_group(group)
+            QMessageBox.information(self, "Yüklendi", "Filtreler başarıyla yüklendi.")
+            
         except Exception as e:
             QMessageBox.critical(self, "Yükleme Hatası", f"Dosya yüklenirken hata oluştu:\n{e}")
+
+
+class FilterWidget(QWidget):
+    """
+    Filtre özet widget'ı - Ana pencerede görüntülenir.
+    
+    Tıklandığında modal FilterDialog açılır.
+    Sadece filtre özetini ve hızlı uygulama butonunu gösterir.
+    """
+    
+    filter_group_changed = pyqtSignal(object)  # FilterGroup
+    
+    SUMMARY_MAX_LENGTH = 100  # Özet için maksimum karakter
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._column_infos: List[ColumnInfo] = []
+        self._current_group: FilterGroup = FilterGroup()
+        self._current_summary = "Henüz filtre eklenmedi"
+        self._setup_ui()
+    
+    def _setup_ui(self):
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+        
+        # === Tıklanabilir özet paneli ===
+        self._summary_frame = QFrame()
+        self._summary_frame.setObjectName("filterSummaryPanel")
+        self._summary_frame.setCursor(Qt.CursorShape.PointingHandCursor)
+        frame_layout = QHBoxLayout(self._summary_frame)
+        frame_layout.setContentsMargins(12, 12, 12, 12)
+        frame_layout.setSpacing(12)
+        
+        # İkon
+        icon_label = QLabel("🔍")
+        icon_label.setObjectName("filterIcon")
+        frame_layout.addWidget(icon_label)
+        
+        # Başlık ve özet
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(4)
+        
+        title = QLabel("Filtreler")
+        title.setObjectName("filterPanelTitle")
+        text_layout.addWidget(title)
+        
+        self._summary_label = QLabel(self._current_summary)
+        self._summary_label.setObjectName("filterPanelSummary")
+        self._summary_label.setWordWrap(True)
+        text_layout.addWidget(self._summary_label)
+        
+        frame_layout.addLayout(text_layout, 1)
+        
+        # Düzenle butonu
+        self._edit_btn = IconFactory.create_tool_button("edit.svg", "")
+        self._edit_btn.setObjectName("filterEditButton")
+        self._edit_btn.setToolTip("Filtreleri düzenle")
+        self._edit_btn.setFixedSize(36, 36)
+        self._edit_btn.clicked.connect(self._open_filter_dialog)
+        frame_layout.addWidget(self._edit_btn)
+        
+        # Hızlı uygula butonu
+        self._quick_apply_btn = IconFactory.create_tool_button("apply_filters.svg", "")
+        self._quick_apply_btn.setObjectName("quickApplyButton")
+        self._quick_apply_btn.setToolTip("Filtreleri Uygula")
+        self._quick_apply_btn.setFixedSize(36, 36)
+        self._quick_apply_btn.clicked.connect(self._apply_filters)
+        frame_layout.addWidget(self._quick_apply_btn)
+        
+        # Frame tıklama olayı
+        self._summary_frame.mousePressEvent = self._on_frame_clicked
+        
+        main_layout.addWidget(self._summary_frame)
+    
+    def _on_frame_clicked(self, event):
+        """Frame'e tıklandığında dialog aç"""
+        # Butonlara tıklandığında tetiklenmemesi için pozisyon kontrolü
+        click_pos = event.pos()
+        edit_btn_rect = self._edit_btn.geometry()
+        apply_btn_rect = self._quick_apply_btn.geometry()
+        
+        if not edit_btn_rect.contains(click_pos) and not apply_btn_rect.contains(click_pos):
+            self._open_filter_dialog()
+    
+    def _open_filter_dialog(self):
+        """Modal filtre dialog'unu aç"""
+        if not self._column_infos:
+            QMessageBox.warning(self, "Uyarı", "Önce bir veri dosyası yükleyin.")
             return
+        
+        dialog = FilterDialog(self._column_infos, self._current_group, self)
+        
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._current_group = dialog.get_filter_group()
+            self._update_summary()
+            self.filter_group_changed.emit(self._current_group)
+    
+    def _apply_filters(self):
+        """Mevcut filtreleri uygula"""
+        self.filter_group_changed.emit(self._current_group)
+    
+    def _update_summary(self):
+        """Filtre özetini günceller"""
+        if self._current_group.is_empty():
+            self._current_summary = "Filtre uygulanmadı - tıklayarak filtre ekleyin"
+        else:
+            self._current_summary = self._current_group.to_display_string()
+        
+        # Özeti kısalt ve tooltip ekle
+        display_text = self._current_summary
+        if len(display_text) > self.SUMMARY_MAX_LENGTH:
+            display_text = display_text[:self.SUMMARY_MAX_LENGTH] + "..."
+            self._summary_label.setToolTip(self._current_summary)
+        else:
+            self._summary_label.setToolTip("")
+        
+        self._summary_label.setText(display_text)
+    
+    def set_column_infos(self, column_infos: List[ColumnInfo]):
+        """Sütun bilgilerini günceller"""
+        self._column_infos = column_infos
+        self._current_group = FilterGroup()
+        self._update_summary()
+    
+    def get_filter_group(self) -> FilterGroup:
+        """Filtre grubunu döndürür"""
+        return self._current_group
+    
+    def set_filter_group(self, group: FilterGroup):
+        """Filtre grubunu ayarlar"""
+        self._current_group = group
+        self._update_summary()
 
-        if not loaded:
-            QMessageBox.warning(self, "Yükleme", "Dosyada geçerli filtre bulunamadı veya okunamadı.")
-            return
-
-        # Check compatibility with current columns
-        compatible = True
-        try:
-            compatible = persistence.is_compatible(loaded, self._column_infos)
-        except Exception:
-            compatible = False
-
-        if not compatible:
-            resp = QMessageBox.question(
-                self,
-                "Uyumsuz Filtreler",
-                "Yüklenen filtreler mevcut sütunlarla veya tiplerle uyumlu değil. Yüklemeye devam edilsin mi?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if resp != QMessageBox.StandardButton.Yes:
-                return
-
-        # Apply (even if incompatible when user forced it)
-        try:
-            self.set_filters(loaded)
-        except Exception as e:
-            QMessageBox.critical(self, "Uygulama Hatası", f"Filtreler uygulanırken hata oluştu:\n{e}")
