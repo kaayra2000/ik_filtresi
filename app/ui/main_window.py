@@ -441,10 +441,11 @@ class MainWindow(QMainWindow):
     
     def _show_about(self):
         """Hakkında dialogu"""
+        from app.version import VERSION
         QMessageBox.about(
             self,
             "IK Filtresi Hakkında",
-            """<h2>IK Filtresi v1.0</h2>
+            f"""<h2>IK Filtresi {VERSION}</h2>
             <p>Veri filtreleme ve analiz aracı.</p>
             <p><b>Özellikler:</b></p>
             <ul>

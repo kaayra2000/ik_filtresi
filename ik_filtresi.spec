@@ -14,6 +14,11 @@ datas = [
     (str(project_root / 'style_dark.qss'), '.'),
 ]
 
+# Versiyon dosyası (build sırasında oluşturulur)
+version_file = project_root / 'version.txt'
+if version_file.exists():
+    datas.append((str(version_file), '.'))
+
 # Include any files placed in app/ui/icons into the build.
 # This walks the icons directory at spec runtime and appends every file
 # so PyInstaller embeds them while preserving the app/... path.
