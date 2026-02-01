@@ -156,27 +156,141 @@ class CategoricalInput(FilterValueInput):
         return self.combo.currentData()
 
 class ListInput(FilterValueInput):
+    """Çok sayıda kategorik değer için geliştirilmiş liste seçici.
+    
+    Özellikler:
+    - Arama/filtreleme kutusu
+    - Kaydırılabilir liste (maksimum yükseklik sınırı)
+    - Tümünü Seç / Temizle butonları
+    - Seçim sayısı özeti
+    """
+    
+    MAX_VISIBLE_HEIGHT = 200  # Maksimum liste yüksekliği (piksel)
+    
     def __init__(self, unique_values: List[Any], parent=None):
         super().__init__(parent)
         self.checkboxes = []
+        self._unique_values = unique_values
         
-        container = QWidget()
-        v_layout = QVBoxLayout(container)
-        v_layout.setContentsMargins(0, 0, 0, 0)
-        v_layout.setSpacing(2)
+        # Ana container
+        main_container = QWidget()
+        main_layout = QVBoxLayout(main_container)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(4)
         
+        # Üst kısım: Arama ve butonlar
+        top_row = QHBoxLayout()
+        top_row.setSpacing(5)
+        
+        # Arama kutusu
+        self._search_edit = QLineEdit()
+        self._search_edit.setPlaceholderText("🔍 Ara...")
+        self._search_edit.setToolTip("Değerleri filtrelemek için arama yapın")
+        self._search_edit.setClearButtonEnabled(True)
+        self._search_edit.textChanged.connect(self._filter_checkboxes)
+        self._search_edit.setMaximumWidth(150)
+        top_row.addWidget(self._search_edit)
+        
+        # Tümünü Seç butonu
+        self._select_all_btn = QToolButton()
+        self._select_all_btn.setText("✓ Tümü")
+        self._select_all_btn.setToolTip("Görünen tüm değerleri seç")
+        self._select_all_btn.clicked.connect(self._select_all_visible)
+        top_row.addWidget(self._select_all_btn)
+        
+        # Temizle butonu
+        self._clear_btn = QToolButton()
+        self._clear_btn.setText("✗ Temizle")
+        self._clear_btn.setToolTip("Tüm seçimleri kaldır")
+        self._clear_btn.clicked.connect(self._clear_all)
+        top_row.addWidget(self._clear_btn)
+        
+        top_row.addStretch()
+        main_layout.addLayout(top_row)
+        
+        # Checkbox listesi için scroll area
+        self._scroll_area = QScrollArea()
+        self._scroll_area.setWidgetResizable(True)
+        self._scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._scroll_area.setMaximumHeight(self.MAX_VISIBLE_HEIGHT)
+        self._scroll_area.setMinimumWidth(200)
+        
+        # Checkbox container
+        checkbox_container = QWidget()
+        self._checkbox_layout = QVBoxLayout(checkbox_container)
+        self._checkbox_layout.setContentsMargins(5, 5, 5, 5)
+        self._checkbox_layout.setSpacing(2)
+        
+        # Checkbox'ları oluştur
         for val in unique_values:
             cb = QCheckBox(str(val))
             cb.setProperty("value", val)
             cb.setToolTip(f"'{val}' değerini filtreye dahil et")
-            cb.stateChanged.connect(self.changed.emit)
+            cb.stateChanged.connect(self._on_checkbox_changed)
             self.checkboxes.append(cb)
-            v_layout.addWidget(cb)
-            
-        self.layout.addWidget(container)
-
+            self._checkbox_layout.addWidget(cb)
+        
+        self._checkbox_layout.addStretch()
+        self._scroll_area.setWidget(checkbox_container)
+        main_layout.addWidget(self._scroll_area)
+        
+        # Alt kısım: Seçim özeti
+        self._summary_label = QLabel()
+        self._summary_label.setStyleSheet("color: #666; font-size: 11px;")
+        main_layout.addWidget(self._summary_label)
+        
+        self.layout.addWidget(main_container)
+        self._update_summary()
+    
+    def _filter_checkboxes(self, search_text: str):
+        """Arama metnine göre checkbox'ları filtreler"""
+        search_lower = search_text.lower()
+        for cb in self.checkboxes:
+            val_str = str(cb.property("value")).lower()
+            cb.setVisible(search_lower in val_str)
+    
+    def _select_all_visible(self):
+        """Görünen tüm checkbox'ları seçer"""
+        for cb in self.checkboxes:
+            if cb.isVisible():
+                cb.setChecked(True)
+    
+    def _clear_all(self):
+        """Tüm seçimleri kaldırır"""
+        for cb in self.checkboxes:
+            cb.setChecked(False)
+    
+    def _on_checkbox_changed(self):
+        """Checkbox durumu değiştiğinde çağrılır"""
+        self._update_summary()
+        self.changed.emit()
+    
+    def _update_summary(self):
+        """Seçim özetini günceller"""
+        selected_count = sum(1 for cb in self.checkboxes if cb.isChecked())
+        total_count = len(self.checkboxes)
+        
+        if selected_count == 0:
+            self._summary_label.setText(f"Seçili: 0 / {total_count}")
+        elif selected_count <= 3:
+            # Az sayıda seçim varsa isimleri göster
+            selected_names = [str(cb.property("value")) for cb in self.checkboxes if cb.isChecked()]
+            names_str = ", ".join(selected_names)
+            if len(names_str) > 40:
+                names_str = names_str[:37] + "..."
+            self._summary_label.setText(f"Seçili ({selected_count}): {names_str}")
+        else:
+            self._summary_label.setText(f"Seçili: {selected_count} / {total_count}")
+    
     def get_value(self) -> List[Any]:
         return [cb.property("value") for cb in self.checkboxes if cb.isChecked()]
+    
+    def set_selected_values(self, values: List[Any]):
+        """Programatik olarak seçili değerleri ayarlar"""
+        values_set = set(values)
+        for cb in self.checkboxes:
+            cb.setChecked(cb.property("value") in values_set)
+        self._update_summary()
 
 class TextInput(FilterValueInput):
     def __init__(self, parent=None):
@@ -427,9 +541,8 @@ class SingleFilterWidget(QFrame):
         # List
         elif isinstance(self._current_input, ListInput):
             try:
-                values = set(val or [])
-                for cb in self._current_input.checkboxes:
-                    cb.setChecked(cb.property("value") in values)
+                values = list(val or [])
+                self._current_input.set_selected_values(values)
             except Exception:
                 pass
         # Text
