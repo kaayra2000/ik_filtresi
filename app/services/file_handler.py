@@ -184,6 +184,238 @@ class ExcelHandler(FileIOStrategy):
             raise e
 
 
+class ODSHandler(FileIOStrategy):
+    """OpenDocument Spreadsheet dosyalarını okur ve yazar (LibreOffice/OpenOffice)"""
+    
+    @property
+    def supported_extensions(self) -> list[str]:
+        return ['.ods']
+    
+    @property
+    def filter_name(self) -> str:
+        return "OpenDocument Dosyaları"
+    
+    def read(self, file_path: Path, **kwargs) -> pd.DataFrame:
+        """
+        ODS dosyasını okur.
+        odfpy motorunu kullanır.
+        """
+        sheet_name = kwargs.get('sheet_name', 0)
+        return pd.read_excel(
+            file_path,
+            sheet_name=sheet_name,
+            engine='odf',
+            parse_dates=True
+        )
+    
+    def write(self, df: pd.DataFrame, file_path: Path, **kwargs) -> bool:
+        """
+        ODS dosyasına yazar.
+        odfpy motorunu kullanır.
+        """
+        try:
+            df.to_excel(file_path, index=False, engine='odf')
+            return True
+        except Exception as e:
+            print(f"ODS yazma hatası: {e}")
+            raise e
+
+
+class JSONHandler(FileIOStrategy):
+    """JSON dosyalarını okur ve yazar"""
+    
+    @property
+    def supported_extensions(self) -> list[str]:
+        return ['.json']
+    
+    @property
+    def filter_name(self) -> str:
+        return "JSON Dosyaları"
+    
+    def read(self, file_path: Path, **kwargs) -> pd.DataFrame:
+        """
+        JSON dosyasını okur.
+        orient parametresi ile farklı JSON yapıları desteklenir.
+        """
+        orient = kwargs.get('orient', None)
+        encoding = kwargs.get('encoding', 'utf-8')
+        
+        # orient belirtilmemişse otomatik algıla
+        if orient is None:
+            orient = self._detect_orient(file_path, encoding)
+        
+        return pd.read_json(
+            file_path,
+            orient=orient,
+            encoding=encoding,
+            convert_dates=True
+        )
+    
+    def write(self, df: pd.DataFrame, file_path: Path, **kwargs) -> bool:
+        """
+        JSON dosyasına yazar.
+        Varsayılan olarak 'records' formatında yazar (dizi içinde objeler).
+        """
+        try:
+            orient = kwargs.get('orient', 'records')
+            indent = kwargs.get('indent', 2)
+            force_ascii = kwargs.get('force_ascii', False)
+            
+            df.to_json(
+                file_path,
+                orient=orient,
+                indent=indent,
+                force_ascii=force_ascii,
+                date_format='iso'
+            )
+            return True
+        except Exception as e:
+            print(f"JSON yazma hatası: {e}")
+            raise e
+    
+    def _detect_orient(self, file_path: Path, encoding: str) -> str:
+        """JSON yapısını otomatik algılar"""
+        import json
+        try:
+            with open(file_path, 'r', encoding=encoding) as f:
+                data = json.load(f)
+            
+            if isinstance(data, list):
+                if len(data) > 0 and isinstance(data[0], dict):
+                    return 'records'
+                return 'values'
+            elif isinstance(data, dict):
+                first_value = next(iter(data.values()), None)
+                if isinstance(first_value, dict):
+                    return 'index'
+                elif isinstance(first_value, list):
+                    return 'columns'
+                return 'split'
+        except Exception:
+            pass
+        return 'records'
+
+
+class PickleHandler(FileIOStrategy):
+    """Python Pickle dosyalarını okur ve yazar (hızlı serileştirme)"""
+    
+    @property
+    def supported_extensions(self) -> list[str]:
+        return ['.pkl', '.pickle']
+    
+    @property
+    def filter_name(self) -> str:
+        return "Pickle Dosyaları"
+    
+    def read(self, file_path: Path, **kwargs) -> pd.DataFrame:
+        """
+        Pickle dosyasını okur.
+        Compression otomatik algılanır.
+        """
+        compression = kwargs.get('compression', 'infer')
+        return pd.read_pickle(file_path, compression=compression)
+    
+    def write(self, df: pd.DataFrame, file_path: Path, **kwargs) -> bool:
+        """
+        Pickle dosyasına yazar.
+        Opsiyonel olarak sıkıştırma destekler.
+        """
+        try:
+            compression = kwargs.get('compression', 'infer')
+            protocol = kwargs.get('protocol', 4)
+            df.to_pickle(file_path, compression=compression, protocol=protocol)
+            return True
+        except Exception as e:
+            print(f"Pickle yazma hatası: {e}")
+            raise e
+
+
+class ParquetHandler(FileIOStrategy):
+    """Apache Parquet dosyalarını okur ve yazar (büyük veri için optimize)"""
+    
+    @property
+    def supported_extensions(self) -> list[str]:
+        return ['.parquet', '.pq']
+    
+    @property
+    def filter_name(self) -> str:
+        return "Parquet Dosyaları"
+    
+    def read(self, file_path: Path, **kwargs) -> pd.DataFrame:
+        """
+        Parquet dosyasını okur.
+        pyarrow veya fastparquet motorunu kullanır.
+        """
+        engine = kwargs.get('engine', 'auto')
+        columns = kwargs.get('columns', None)
+        
+        return pd.read_parquet(
+            file_path,
+            engine=engine,
+            columns=columns
+        )
+    
+    def write(self, df: pd.DataFrame, file_path: Path, **kwargs) -> bool:
+        """
+        Parquet dosyasına yazar.
+        Sıkıştırma varsayılan olarak snappy kullanır.
+        Sütun isimleri otomatik olarak string'e dönüştürülür.
+        """
+        try:
+            engine = kwargs.get('engine', 'auto')
+            compression = kwargs.get('compression', 'snappy')
+            # Parquet karışık tip sütun isimlerini desteklemez, string'e çevir
+            df_copy = df.copy()
+            df_copy.columns = df_copy.columns.astype(str)
+            df_copy.to_parquet(
+                file_path,
+                engine=engine,
+                compression=compression,
+                index=False
+            )
+            return True
+        except Exception as e:
+            print(f"Parquet yazma hatası: {e}")
+            raise e
+
+
+class FeatherHandler(FileIOStrategy):
+    """Apache Arrow Feather dosyalarını okur ve yazar (hızlı I/O)"""
+    
+    @property
+    def supported_extensions(self) -> list[str]:
+        return ['.feather', '.ftr']
+    
+    @property
+    def filter_name(self) -> str:
+        return "Feather Dosyaları"
+    
+    def read(self, file_path: Path, **kwargs) -> pd.DataFrame:
+        """
+        Feather dosyasını okur.
+        Çok hızlı okuma performansı sağlar.
+        """
+        columns = kwargs.get('columns', None)
+        return pd.read_feather(file_path, columns=columns)
+    
+    def write(self, df: pd.DataFrame, file_path: Path, **kwargs) -> bool:
+        """
+        Feather dosyasına yazar.
+        Çok hızlı yazma performansı sağlar.
+        Sütun isimleri otomatik olarak string'e dönüştürülür.
+        """
+        try:
+            compression = kwargs.get('compression', 'zstd')
+            # Feather karışık tip sütun isimlerini desteklemez, string'e çevir
+            df_copy = df.copy()
+            df_copy.columns = df_copy.columns.astype(str)
+            df_copy.to_feather(file_path, compression=compression)
+            return True
+        except Exception as e:
+            print(f"Feather yazma hatası: {e}")
+            raise e
+
+
 class FileIORegistry:
     """
     Merkezi dosya I/O kayıt sistemi.
@@ -319,3 +551,8 @@ class FileIORegistry:
 # ============ Handler Registrations (Open/Closed Principle) ============
 FileIORegistry.register(CSVHandler())
 FileIORegistry.register(ExcelHandler())
+FileIORegistry.register(ODSHandler())
+FileIORegistry.register(JSONHandler())
+FileIORegistry.register(PickleHandler())
+FileIORegistry.register(ParquetHandler())
+FileIORegistry.register(FeatherHandler())
