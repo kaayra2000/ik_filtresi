@@ -212,9 +212,18 @@ class ODSHandler(FileIOStrategy):
         """
         ODS dosyasına yazar.
         odfpy motorunu kullanır.
+        Tarih sütunları için uygun format uygulanır.
         """
         try:
-            df.to_excel(file_path, index=False, engine='odf')
+            # DataFrame'in bir kopyasını oluştur
+            df_copy = df.copy()
+            
+            # Tarih sütunlarını string formatına çevir (ODS uyumluluğu için)
+            date_columns = df_copy.select_dtypes(include=['datetime64[ns]', 'datetime64']).columns
+            for col in date_columns:
+                df_copy[col] = df_copy[col].dt.strftime('%Y-%m-%d')
+            
+            df_copy.to_excel(file_path, index=False, engine='odf')
             return True
         except Exception as e:
             print(f"ODS yazma hatası: {e}")
