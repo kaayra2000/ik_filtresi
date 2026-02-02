@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QApplication,
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings
+from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings, QTimer
 from PyQt6.QtGui import QAction, QScreen
 from pathlib import Path
 from typing import Optional, List
@@ -362,6 +362,11 @@ class MainWindow(QMainWindow):
 
     def _prompt_file_selection(self):
         """Dosya seçim dialogunu gösterir"""
+        # Menü kapandıktan sonra dialog açılsın diye kısa gecikme
+        QTimer.singleShot(50, self._show_file_dialog)
+
+    def _show_file_dialog(self):
+        """Dosya seçim dialogunu gösterir (gecikme sonrası)"""
         file_filter = FileIORegistry.get_file_filter()
 
         file_path, _ = QFileDialog.getOpenFileName(
