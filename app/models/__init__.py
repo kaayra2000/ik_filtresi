@@ -1,6 +1,7 @@
 """
 Models paketi
 """
+
 from app.models.column_info import ColumnInfo, ColumnType
 from app.models.filter_model import FilterModel, FilterOperator
 from app.models.formatters import (
@@ -14,15 +15,15 @@ from app.models.formatters import (
 )
 
 __all__ = [
-    'ColumnInfo', 
-    'ColumnType', 
-    'FilterModel', 
-    'FilterOperator',
-    'ValueFormatter',
-    'DateFormatter',
-    'NumericFormatter',
-    'TextFormatter',
-    'BooleanFormatter',
-    'UnknownFormatter',
-    'FormatterFactory',
+    "ColumnInfo",
+    "ColumnType",
+    "FilterModel",
+    "FilterOperator",
+    "ValueFormatter",
+    "DateFormatter",
+    "NumericFormatter",
+    "TextFormatter",
+    "BooleanFormatter",
+    "UnknownFormatter",
+    "FormatterFactory",
 ]
