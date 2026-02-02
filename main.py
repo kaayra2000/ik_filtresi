@@ -31,12 +31,12 @@ def main() -> None:
     icon_path = Path(__file__).parent / "app" / "ui" / "icons" / "bilgem_logo.png"
     if icon_path.exists():
         app.setWindowIcon(QIcon(str(icon_path)))
-    
+
     load_stylesheet(app)
-    
+
     window = MainWindow()
     window.show()
-    
+
     sys.exit(app.exec())
 
 

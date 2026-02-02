@@ -50,15 +50,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[
-        'tkinter',
-        'matplotlib',
-        'scipy',
-        'PIL',
-        'cv2',
-        'torch',
-        'tensorflow',
-    ],
+    excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -81,9 +73,9 @@ exe = EXE(
     name='IK_Filtresi',
     debug=False,
     bootloader_ignore_signals=False,
-    strip=False,
-    upx=True,
-    console=False,  # GUI uygulaması, konsol gizli
+    strip=True,  # Debug sembollerini kaldır - boyutu küçültür
+    upx=True,   # Daha küçük binary
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

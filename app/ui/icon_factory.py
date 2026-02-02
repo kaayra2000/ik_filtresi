@@ -44,7 +44,7 @@ class IconFactory:
         widget: QToolButton,
         name: str,
         size: Optional[QSize] = None,
-        text_beside_icon: bool = True
+        text_beside_icon: bool = True,
     ):
         """Set icon on a QToolButton with left alignment.
 
@@ -55,7 +55,7 @@ class IconFactory:
             text_beside_icon: If True, text appears beside icon (default True)
         """
         icon = IconFactory.load_icon(name)
-        
+
         try:
             widget.setIcon(icon)
         except Exception:
@@ -76,10 +76,7 @@ class IconFactory:
 
     @staticmethod
     def create_tool_button(
-        name: str,
-        text: str = "",
-        size: Optional[QSize] = None,
-        min_width: int = 120
+        name: str, text: str = "", size: Optional[QSize] = None, min_width: int = 120
     ) -> QToolButton:
         """Create a left-aligned QToolButton with icon.
 
@@ -101,7 +98,9 @@ class IconFactory:
 
         # Centralize size policy and baseline styling for all icon buttons
         try:
-            button.setSizePolicy(QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed))
+            button.setSizePolicy(
+                QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            )
             # Size policy centralized; visual alignment moved to style.qss
         except Exception:
             pass
