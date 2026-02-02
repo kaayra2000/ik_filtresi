@@ -8,10 +8,11 @@ block_cipher = None
 # Proje kök dizini
 project_root = Path(SPECPATH)
 
-# Veri dosyaları (QSS stil dosyaları dahil)
+# Veri dosyaları (QSS stil dosyaları ve yardım dosyası dahil)
 datas = [
     (str(project_root / 'style.qss'), '.'),
     (str(project_root / 'style_dark.qss'), '.'),
+    (str(project_root / 'app' / 'help.md'), 'app'),
 ]
 
 # Versiyon dosyası (build sırasında oluşturulur)

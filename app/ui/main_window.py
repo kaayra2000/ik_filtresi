@@ -235,7 +235,8 @@ class MainWindow(QMainWindow):
         open_action.triggered.connect(self._prompt_file_selection)
         file_menu.addAction(open_action)
         
-        file_menu.addSeparator()
+        # Kaydet alt menüsü
+        save_menu = file_menu.addMenu("&Kaydet")
         
         # FileIORegistry'den dinamik olarak export seçeneklerini oluştur (OCP uyumlu)
         shortcuts = ["Ctrl+S", "Ctrl+Shift+S"]  # İlk iki format için kısayollar
@@ -253,7 +254,7 @@ class MainWindow(QMainWindow):
             export_action.triggered.connect(
                 lambda checked, fmt=ext: self._data_table_widget._export_data(fmt)
             )
-            file_menu.addAction(export_action)
+            save_menu.addAction(export_action)
         
         file_menu.addSeparator()
         
@@ -262,28 +263,31 @@ class MainWindow(QMainWindow):
         exit_action.triggered.connect(self.close)
         file_menu.addAction(exit_action)
         
-        # Görünüm menüsü (Tema seçimi)
-        view_menu = menubar.addMenu("&Görünüm")
+        # Tema menüsü
+        view_menu = menubar.addMenu("&Tema")
         
-        # Tema alt menüsü
-        theme_menu = view_menu.addMenu("🎨 Tema")
-        
-        self._light_theme_action = QAction("☀️ Açık Tema", self)
+        self._light_theme_action = QAction("☀️ Tema", self)
         self._light_theme_action.setCheckable(True)
         self._light_theme_action.setChecked(True)
         self._light_theme_action.triggered.connect(lambda: self._set_theme("light"))
-        theme_menu.addAction(self._light_theme_action)
+        view_menu.addAction(self._light_theme_action)
         
-        self._dark_theme_action = QAction("🌙 Koyu Tema", self)
+        self._dark_theme_action = QAction("🌙 Tema", self)
         self._dark_theme_action.setCheckable(True)
         self._dark_theme_action.setChecked(False)
         self._dark_theme_action.triggered.connect(lambda: self._set_theme("dark"))
-        theme_menu.addAction(self._dark_theme_action)
+        view_menu.addAction(self._dark_theme_action)
         
         # Yardım menüsü
         help_menu = menubar.addMenu("&Yardım")
         
-        about_action = QAction("&Hakkında", self)
+        usage_action = QAction("📖 &Nasıl Kullanılır?", self)
+        usage_action.triggered.connect(self._show_help)
+        help_menu.addAction(usage_action)
+        
+        help_menu.addSeparator()
+        
+        about_action = QAction("ℹ️ &Hakkında", self)
         about_action.triggered.connect(self._show_about)
         help_menu.addAction(about_action)
     
@@ -434,6 +438,94 @@ class MainWindow(QMainWindow):
                 "Filtre Hatası",
                 f"Filtre uygulanırken hata oluştu:\n{str(e)}"
             )
+    
+    def _show_help(self):
+        """Yardım/Kullanım kılavuzu dialogu"""
+        help_path = Path(__file__).parent.parent / "help.md"
+        
+        if help_path.exists():
+            with open(help_path, "r", encoding="utf-8") as f:
+                help_content = f.read()
+            
+            # Markdown'ı basit HTML'e dönüştür
+            html_content = self._markdown_to_html(help_content)
+            
+            # Dialog oluştur
+            dialog = QDialog(self)
+            dialog.setWindowTitle("Nasıl Kullanılır?")
+            dialog.setMinimumSize(600, 500)
+            dialog.resize(700, 600)
+            
+            layout = QVBoxLayout(dialog)
+            
+            from PyQt6.QtWidgets import QTextBrowser
+            text_browser = QTextBrowser()
+            text_browser.setHtml(html_content)
+            text_browser.setOpenExternalLinks(True)
+            layout.addWidget(text_browser)
+            
+            close_btn = QPushButton("Kapat")
+            close_btn.clicked.connect(dialog.accept)
+            layout.addWidget(close_btn)
+            
+            dialog.exec()
+        else:
+            QMessageBox.warning(
+                self,
+                "Yardım Dosyası Bulunamadı",
+                "Yardım dosyası (help.md) bulunamadı."
+            )
+    
+    def _markdown_to_html(self, md_text: str) -> str:
+        """Basit markdown'ı HTML'e dönüştürür"""
+        import re
+        
+        html = md_text
+        
+        # Başlıklar
+        html = re.sub(r'^### (.+)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
+        html = re.sub(r'^## (.+)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
+        html = re.sub(r'^# (.+)$', r'<h1>\1</h1>', html, flags=re.MULTILINE)
+        
+        # Bold
+        html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', html)
+        
+        # Kod (backtick)
+        html = re.sub(r'`(.+?)`', r'<code>\1</code>', html)
+        
+        # Yatay çizgi
+        html = re.sub(r'^---$', r'<hr>', html, flags=re.MULTILINE)
+        
+        # Liste öğeleri
+        html = re.sub(r'^- (.+)$', r'<li>\1</li>', html, flags=re.MULTILINE)
+        
+        # Paragraflar (boş satırlar)
+        html = re.sub(r'\n\n', r'</p><p>', html)
+        
+        # Tablo dönüşümü (basit)
+        lines = html.split('\n')
+        in_table = False
+        new_lines = []
+        for line in lines:
+            if '|' in line and not line.strip().startswith('|---'):
+                if not in_table:
+                    new_lines.append('<table border="1" cellpadding="5" cellspacing="0">')
+                    in_table = True
+                cells = [c.strip() for c in line.split('|')[1:-1]]
+                row = '<tr>' + ''.join(f'<td>{c}</td>' for c in cells) + '</tr>'
+                new_lines.append(row)
+            elif line.strip().startswith('|---'):
+                continue  # Tablo ayırıcı satırını atla
+            else:
+                if in_table:
+                    new_lines.append('</table>')
+                    in_table = False
+                new_lines.append(line)
+        if in_table:
+            new_lines.append('</table>')
+        html = '\n'.join(new_lines)
+        
+        return f'<html><body style="font-family: sans-serif; padding: 10px;"><p>{html}</p></body></html>'
     
     def _show_about(self):
         """Hakkında dialogu"""
