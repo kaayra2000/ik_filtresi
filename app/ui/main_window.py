@@ -13,8 +13,7 @@ from typing import Optional, List
 
 import pandas as pd
 
-from app.services.file_reader import FileReaderFactory
-from app.services.file_writer import FileWriterFactory
+from app.services.file_handler import FileIORegistry
 from app.services.data_analyzer import DataAnalyzer
 from app.services.filter_engine import FilterEngine
 from app.services.filter_persistence import FilterPersistence
@@ -40,13 +39,12 @@ class FileLoaderThread(QThread):
     def __init__(self, file_path: Path, parent=None):
         super().__init__(parent)
         self._file_path = file_path
-        self._factory = FileReaderFactory()
         self._analyzer = DataAnalyzer()
     
     def run(self):
         try:
             self.progress.emit("Dosya okunuyor...")
-            df = self._factory.read_file(self._file_path)
+            df = FileIORegistry.read_file(self._file_path)
             
             self.progress.emit("Sütunlar analiz ediliyor...")
             column_infos = self._analyzer.analyze(df)
@@ -78,7 +76,6 @@ class MainWindow(QMainWindow):
         self._current_theme: str = "light"  # Varsayılan tema
         self._settings = QSettings(APP_ORG, APP_NAME)  # Ayarları yükle/kaydet
         
-        self._file_reader = FileReaderFactory()
         self._filter_engine = FilterEngine()
         self._filter_persistence = FilterPersistence()
         
@@ -240,11 +237,10 @@ class MainWindow(QMainWindow):
         
         file_menu.addSeparator()
         
-        # FileWriterFactory'den dinamik olarak export seçeneklerini oluştur (OCP uyumlu)
-        writer_factory = FileWriterFactory()
+        # FileIORegistry'den dinamik olarak export seçeneklerini oluştur (OCP uyumlu)
         shortcuts = ["Ctrl+S", "Ctrl+Shift+S"]  # İlk iki format için kısayollar
         
-        for idx, desc in enumerate(writer_factory.get_format_descriptors()):
+        for idx, desc in enumerate(FileIORegistry.get_format_descriptors()):
             ext = desc.get('default', '').lstrip('.')
             action_text = f"{ext.upper()} Olarak Kaydet..."
             export_action = QAction(action_text, self)
@@ -337,7 +333,7 @@ class MainWindow(QMainWindow):
     
     def _prompt_file_selection(self):
         """Dosya seçim dialogunu gösterir"""
-        file_filter = self._file_reader.get_file_filter()
+        file_filter = FileIORegistry.get_file_filter()
         
         file_path, _ = QFileDialog.getOpenFileName(
             self,
