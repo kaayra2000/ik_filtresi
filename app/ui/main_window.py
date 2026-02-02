@@ -466,10 +466,6 @@ class MainWindow(QMainWindow):
             text_browser.setOpenExternalLinks(True)
             layout.addWidget(text_browser)
             
-            close_btn = QPushButton("Kapat")
-            close_btn.clicked.connect(dialog.accept)
-            layout.addWidget(close_btn)
-            
             dialog.exec()
         else:
             QMessageBox.warning(
