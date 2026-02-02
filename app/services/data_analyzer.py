@@ -93,11 +93,11 @@ class DataAnalyzer:
         if pd.api.types.is_bool_dtype(dtype):
             return ColumnType.BOOLEAN
         
-        # Object tip - tarih olabilir mi kontrol et
-        if dtype == object:
+        # Metin benzeri tipler (object, string, category) - tarih olabilir mi kontrol et
+        if pd.api.types.is_object_dtype(dtype) or pd.api.types.is_string_dtype(dtype) or pd.api.types.is_categorical_dtype(dtype):
             if self._is_date_column(non_null):
                 return ColumnType.DATE
-            
+
             # Boolean metin kontrolü
             unique_lower = set(str(v).lower() for v in non_null.unique())
             if unique_lower.issubset({'true', 'false', 'evet', 'hayır', 'yes', 'no', '1', '0'}):
@@ -188,7 +188,11 @@ class DataAnalyzer:
             if info.column_type == ColumnType.DATE:
                 if not pd.api.types.is_datetime64_any_dtype(df[info.name]):
                     try:
-                        df[info.name] = pd.to_datetime(df[info.name], dayfirst=True)
+                        df[info.name] = pd.to_datetime(
+                            df[info.name], 
+                            format='mixed',
+                            dayfirst=True
+                        )
                     except Exception:
                         pass
         

@@ -13,7 +13,7 @@ from app.ui.icon_factory import IconFactory
 
 import pandas as pd
 import numpy as np
-from app.services.file_writer import FileWriterFactory
+from app.services.file_handler import FileIORegistry
 
 
 class PandasTableModel(QAbstractTableModel):
@@ -232,9 +232,8 @@ class DataTableWidget(QWidget):
         layout.addLayout(export_layout)
     
     def _populate_format_combo(self):
-        """Format combo box'ı FileWriterFactory'den dinamik olarak doldurur (SRP)."""
-        writer_factory = FileWriterFactory()
-        for desc in writer_factory.get_format_descriptors():
+        """Format combo box'ı FileIORegistry'den dinamik olarak doldurur (SRP)."""
+        for desc in FileIORegistry.get_format_descriptors():
             idx = self._format_combo.count()
             self._format_combo.addItem(desc['name'])
             self._format_combo.setItemData(idx, desc, Qt.ItemDataRole.UserRole)
@@ -301,10 +300,9 @@ class DataTableWidget(QWidget):
     def _export_data(self, format_type: str):
         """Menüden çağrılan export metodu - format türüne göre kaydetme yapar.
         
-        FileWriterFactory'den dinamik olarak format bilgilerini alır (OCP uyumlu).
+        FileIORegistry'den dinamik olarak format bilgilerini alır (OCP uyumlu).
         """
-        writer_factory = FileWriterFactory()
-        desc = writer_factory.get_descriptor_by_extension(format_type)
+        desc = FileIORegistry.get_descriptor_by_extension(format_type)
         
         if desc:
             self._export_data_with_filter(desc['filter'], desc['default'])
@@ -331,8 +329,7 @@ class DataTableWidget(QWidget):
             file_path += default_suffix
         
         try:
-            writer_factory = FileWriterFactory()
-            writer_factory.write_file(self._filtered_df, Path(file_path))
+            FileIORegistry.write_file(self._filtered_df, Path(file_path))
             
             QMessageBox.information(
                 self,
