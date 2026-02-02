@@ -10,7 +10,7 @@ IK Filtresi, Excel ve CSV dosyalarındaki verileri hızlı ve kolay bir şekilde
 
 ### 1. Dosya Açma
 - **Dosya → Aç** menüsünden veya **Ctrl+O** kısayoluyla dosya seçin
-- Desteklenen formatlar: `.xlsx`, `.xls`, `.csv`
+- Desteklenen biçimler: `.xlsx`, `.xls`, `.csv`, `.txt`, `.ods`, `.tsv`, `json`, `pickle`, `feather`, `parquet`
 - Uygulama açılınca otomatik olarak dosya seçim penceresi açılır
 
 ### 2. Veri Görüntüleme
@@ -51,7 +51,7 @@ IK Filtresi, Excel ve CSV dosyalarındaki verileri hızlı ve kolay bir şekilde
 - **Büyük dosyalar** için yükleme biraz zaman alabilir, progress bar'ı takip edin
 - **Tarih sütunları** otomatik algılanır ve tarih filtresi kullanılabilir hale gelir
 - **Tema değişikliği** için Tema menüsünden Açık/Koyu tema seçebilirsiniz
-- Filtreler **kaydedilmez**, uygulama kapandığında sıfırlanır
+- **Filtreler** uygulandıktan sonra uygulama kapatılsa bile açılışta filtreler korunur
 
 ---
 

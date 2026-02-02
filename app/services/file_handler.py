@@ -219,9 +219,14 @@ class ODSHandler(FileIOStrategy):
             df_copy = df.copy()
             
             # Tarih sütunlarını string formatına çevir (ODS uyumluluğu için)
+            # NaT içerebilecek sütunları güvenli şekilde işle
             date_columns = df_copy.select_dtypes(include=['datetime64[ns]', 'datetime64']).columns
             for col in date_columns:
-                df_copy[col] = df_copy[col].dt.strftime('%Y-%m-%d')
+                # NaT değerlerinde hata almamak için sadece dolu hücrelere strftime uygula
+                non_null_mask = df_copy[col].notna()
+                df_copy.loc[non_null_mask, col] = df_copy.loc[non_null_mask, col].dt.strftime('%Y-%m-%d')
+                # Boş tarihleri ODS için boş string olarak bırak
+                df_copy.loc[~non_null_mask, col] = ''
             
             df_copy.to_excel(file_path, index=False, engine='odf')
             return True

@@ -266,13 +266,13 @@ class MainWindow(QMainWindow):
         # Tema menüsü
         view_menu = menubar.addMenu("&Tema")
         
-        self._light_theme_action = QAction("☀️ Tema", self)
+        self._light_theme_action = QAction("☀️ Açık", self)
         self._light_theme_action.setCheckable(True)
         self._light_theme_action.setChecked(True)
         self._light_theme_action.triggered.connect(lambda: self._set_theme("light"))
         view_menu.addAction(self._light_theme_action)
         
-        self._dark_theme_action = QAction("🌙 Tema", self)
+        self._dark_theme_action = QAction("🌙 Koyu", self)
         self._dark_theme_action.setCheckable(True)
         self._dark_theme_action.setChecked(False)
         self._dark_theme_action.triggered.connect(lambda: self._set_theme("dark"))
@@ -449,23 +449,21 @@ class MainWindow(QMainWindow):
             with open(help_path, "r", encoding="utf-8") as f:
                 help_content = f.read()
             
-            # Markdown'ı basit HTML'e dönüştür
-            html_content = self._markdown_to_html(help_content)
-            
-            # Dialog oluştur
+            # Düz markdown'u olduğu gibi göster
             dialog = QDialog(self)
             dialog.setWindowTitle("Nasıl Kullanılır?")
             dialog.setMinimumSize(600, 500)
             dialog.resize(700, 600)
-            
+
             layout = QVBoxLayout(dialog)
-            
+
             from PyQt6.QtWidgets import QTextBrowser
             text_browser = QTextBrowser()
-            text_browser.setHtml(html_content)
+            # Gösterimde markdown işlenmesin; düz metin olarak ayarla
+            text_browser.setMarkdown(help_content)
             text_browser.setOpenExternalLinks(True)
             layout.addWidget(text_browser)
-            
+
             dialog.exec()
         else:
             QMessageBox.warning(
@@ -474,56 +472,6 @@ class MainWindow(QMainWindow):
                 "Yardım dosyası (help.md) bulunamadı."
             )
     
-    def _markdown_to_html(self, md_text: str) -> str:
-        """Basit markdown'ı HTML'e dönüştürür"""
-        import re
-        
-        html = md_text
-        
-        # Başlıklar
-        html = re.sub(r'^### (.+)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
-        html = re.sub(r'^## (.+)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
-        html = re.sub(r'^# (.+)$', r'<h1>\1</h1>', html, flags=re.MULTILINE)
-        
-        # Bold
-        html = re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', html)
-        
-        # Kod (backtick)
-        html = re.sub(r'`(.+?)`', r'<code>\1</code>', html)
-        
-        # Yatay çizgi
-        html = re.sub(r'^---$', r'<hr>', html, flags=re.MULTILINE)
-        
-        # Liste öğeleri
-        html = re.sub(r'^- (.+)$', r'<li>\1</li>', html, flags=re.MULTILINE)
-        
-        # Paragraflar (boş satırlar)
-        html = re.sub(r'\n\n', r'</p><p>', html)
-        
-        # Tablo dönüşümü (basit)
-        lines = html.split('\n')
-        in_table = False
-        new_lines = []
-        for line in lines:
-            if '|' in line and not line.strip().startswith('|---'):
-                if not in_table:
-                    new_lines.append('<table border="1" cellpadding="5" cellspacing="0">')
-                    in_table = True
-                cells = [c.strip() for c in line.split('|')[1:-1]]
-                row = '<tr>' + ''.join(f'<td>{c}</td>' for c in cells) + '</tr>'
-                new_lines.append(row)
-            elif line.strip().startswith('|---'):
-                continue  # Tablo ayırıcı satırını atla
-            else:
-                if in_table:
-                    new_lines.append('</table>')
-                    in_table = False
-                new_lines.append(line)
-        if in_table:
-            new_lines.append('</table>')
-        html = '\n'.join(new_lines)
-        
-        return f'<html><body style="font-family: sans-serif; padding: 10px;"><p>{html}</p></body></html>'
     
     def _show_about(self):
         """Hakkında dialogu"""
