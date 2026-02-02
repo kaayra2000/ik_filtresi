@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QApplication,
 )
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings, QTimer
+from PyQt6.QtCore import QThread, pyqtSignal, QSettings, QTimer
 from PyQt6.QtGui import QAction
 from pathlib import Path
 from typing import Optional, List

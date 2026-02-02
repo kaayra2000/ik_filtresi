@@ -19,19 +19,18 @@ class ScreenUtils:
         Mevcut/birincil ekranı döndürür.
         Çoklu monitör durumunda fare imlecinin bulunduğu ekranı tercih eder.
         """
+        from PyQt6.QtGui import QCursor, QGuiApplication
+
         app = QApplication.instance()
         if not app:
             return QApplication.primaryScreen()
 
-        # Fare imlecinin bulunduğu ekranı bul
-        cursor_pos = app.primaryScreen().geometry().center()
-
-        # Tüm ekranları kontrol et
-        for screen in QApplication.screens():
-            if screen.geometry().contains(cursor_pos):
-                return screen
-
-        # Varsayılan olarak birincil ekranı döndür
+        # Gerçek fare imleci konumunu al
+        cursor_pos = QCursor.pos()
+        screen = QGuiApplication.screenAt(cursor_pos)
+        if screen is not None:
+            return screen
+        # Fallback: birincil ekran
         return QApplication.primaryScreen()
 
     @staticmethod
@@ -69,11 +68,11 @@ class ScreenUtils:
     ) -> tuple[int, int]:
         """
         Ekran çözünürlüğüne göre pencere boyutunu hesaplar.
-        
+
         Args:
             width_ratio: Ekran genişliğinin yüzdesi (varsayılan %75)
             height_ratio: Ekran yüksekliğinin yüzdesi (varsayılan %80)
-        
+
         Returns:
             (width, height) tuple
         """
@@ -91,11 +90,11 @@ class ScreenUtils:
     ) -> tuple[int, int]:
         """
         Ekran çözünürlüğüne göre minimum pencere boyutunu hesaplar.
-        
+
         Args:
             width_ratio: Ekran genişliğinin yüzdesi (varsayılan %50)
             height_ratio: Ekran yüksekliğinin yüzdesi (varsayılan %50)
-        
+
         Returns:
             (min_width, min_height) tuple - en az 800x600
         """

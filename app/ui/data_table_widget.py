@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import (
     QTableView,
     QLabel,
     QHBoxLayout,
-    QToolButton,
     QFileDialog,
     QHeaderView,
     QMessageBox,
@@ -20,10 +19,9 @@ from PyQt6.QtCore import (
     QAbstractTableModel,
     QModelIndex,
     QVariant,
-    QSize,
     QSortFilterProxyModel,
 )
-from PyQt6.QtGui import QColor, QIcon, QPixmap
+from PyQt6.QtGui import QColor
 from typing import Optional
 from pathlib import Path
 from app.ui.icon_factory import IconFactory
@@ -315,24 +313,28 @@ class DataTableWidget(QWidget):
             self._stats_label.setText(f"Gösterilen: {filtered} / {total} kayıt")
 
     def _resize_columns_to_contents(self):
-        """Sütun genişliklerini içeriğe göre ayarlar"""
+        """Sütun genişliklerini içeriğe göre ayarlar (UI lag'ını önlemek için ertelenmiş ve optimize edilmiş)."""
         if self._filtered_df is None or len(self._filtered_df.columns) == 0:
             return
-        
-        header = self._table_view.horizontalHeader()
-        
-        # Önce tüm sütunları içeriğe göre boyutlandır
-        for col in range(self._model.columnCount()):
-            self._table_view.resizeColumnToContents(col)
-        
-        # Ekran çözünürlüğüne göre azami genişlik sınırı hesapla
-        max_width = ScreenUtils.calculate_max_column_width()
-        
-        for col in range(self._model.columnCount()):
-            current_width = header.sectionSize(col)
-            # Azami genişlik kontrolü
-            if current_width > max_width:
-                header.resizeSection(col, max_width)
+
+        def do_resize():
+            header = self._table_view.horizontalHeader()
+            # Daha az maliyetli: ResizeToContents modunu uygula
+            header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+
+            # Ekran çözünürlüğüne göre azami genişlik sınırı hesapla
+            max_width = ScreenUtils.calculate_max_column_width()
+            for col in range(self._model.columnCount()):
+                current_width = header.sectionSize(col)
+                if current_width > max_width:
+                    header.resizeSection(col, max_width)
+            # Sonrasında tekrar Interactive moda al, böylece kullanıcı manuel ayarlayabilir
+            header.setSectionResizeMode(QHeaderView.ResizeMode.Interactive)
+
+        # UI thread'ini bloklamamak için ertele
+        from PyQt6.QtCore import QTimer
+
+        QTimer.singleShot(0, do_resize)
 
     def _on_save_clicked(self):
         """Kaydet butonuna tıklandığında"""
