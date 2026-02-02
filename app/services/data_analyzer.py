@@ -188,7 +188,11 @@ class DataAnalyzer:
             if info.column_type == ColumnType.DATE:
                 if not pd.api.types.is_datetime64_any_dtype(df[info.name]):
                     try:
-                        df[info.name] = pd.to_datetime(df[info.name], dayfirst=True)
+                        df[info.name] = pd.to_datetime(
+                            df[info.name], 
+                            format='mixed',
+                            dayfirst=True
+                        )
                     except Exception:
                         pass
         

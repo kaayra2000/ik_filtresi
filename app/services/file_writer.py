@@ -2,8 +2,9 @@
 Dosya yazma servisi - Strategy Pattern ile farklı dosya formatlarına yazar
 """
 from abc import ABC, abstractmethod
+import inspect
 from pathlib import Path
-from typing import Optional
+from typing import ClassVar, Optional
 
 import pandas as pd
 
@@ -13,7 +14,23 @@ class FileWriterStrategy(ABC):
     Dosya yazma stratejisi için soyut sınıf.
     Open/Closed Principle: Yeni dosya formatları eklemek için mevcut kodu değiştirmeden
     yeni strategy sınıfları oluşturulabilir.
+    
+    Auto-registration: Alt sınıflar otomatik olarak _registry'ye kaydedilir.
     """
+    
+    _registry: ClassVar[list['FileWriterStrategy']] = []
+    
+    def __init_subclass__(cls, **kwargs) -> None:
+        """Alt sınıflar tanımlandığında otomatik olarak registry'ye kaydeder."""
+        super().__init_subclass__(**kwargs)
+        # Abstract sınıfları kaydetme
+        if not inspect.isabstract(cls):
+            cls._registry.append(cls())
+    
+    @classmethod
+    def get_all_strategies(cls) -> list['FileWriterStrategy']:
+        """Kayıtlı tüm stratejileri döndürür."""
+        return cls._registry.copy()
     
     @abstractmethod
     def can_write(self, file_path: Path) -> bool:
@@ -81,13 +98,12 @@ class ExcelWriter(FileWriterStrategy):
 class FileWriterFactory:
     """
     Dosya yazıcı fabrikası.
+    
+    Stratejiler otomatik olarak FileWriterStrategy'den türetildiğinde kaydedilir.
     """
     
     def __init__(self):
-        self._strategies: list[FileWriterStrategy] = [
-            ExcelWriter(),
-            CSVWriter()
-        ]
+        self._strategies: list[FileWriterStrategy] = FileWriterStrategy.get_all_strategies()
     
     def register_strategy(self, strategy: FileWriterStrategy) -> None:
         """Yeni bir yazma stratejisi ekler"""
