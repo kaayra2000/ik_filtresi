@@ -459,7 +459,7 @@ class MainWindow(QMainWindow):
 
             from PyQt6.QtWidgets import QTextBrowser
             text_browser = QTextBrowser()
-            # Gösterimde markdown işlenmesin; düz metin olarak ayarla
+            # Markdown içeriğini işle ve görüntüle
             text_browser.setMarkdown(help_content)
             text_browser.setOpenExternalLinks(True)
             layout.addWidget(text_browser)
