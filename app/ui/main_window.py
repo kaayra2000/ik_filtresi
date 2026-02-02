@@ -421,6 +421,8 @@ class MainWindow(QMainWindow):
         if group is None or group.is_empty():
             self._data_table_widget.reset_to_original()
             self._status_bar.showMessage("Filtreler temizlendi")
+            # Boş filtre grubunu da kaydet - uygulama yeniden açıldığında eski filtre gelmemesi için
+            self._filter_persistence.save_filter_group(FilterGroup())
             return
         
         try:
