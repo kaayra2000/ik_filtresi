@@ -27,6 +27,7 @@ from PyQt6.QtGui import QColor, QIcon, QPixmap
 from typing import Optional
 from pathlib import Path
 from app.ui.icon_factory import IconFactory
+from app.ui.screen_utils import ScreenUtils
 
 import pandas as pd
 import numpy as np
@@ -275,6 +276,8 @@ class DataTableWidget(QWidget):
         self._update_stats()
         self._format_combo.setEnabled(True)
         self._save_btn.setEnabled(True)
+        # Sütun genişliklerini içeriğe göre ayarla
+        self._resize_columns_to_contents()
 
     def set_column_infos(self, column_infos):
         """Keep column infos to provide header tooltips via model."""
@@ -310,6 +313,26 @@ class DataTableWidget(QWidget):
             self._stats_label.setText(f"Toplam: {total} kayıt")
         else:
             self._stats_label.setText(f"Gösterilen: {filtered} / {total} kayıt")
+
+    def _resize_columns_to_contents(self):
+        """Sütun genişliklerini içeriğe göre ayarlar"""
+        if self._filtered_df is None or len(self._filtered_df.columns) == 0:
+            return
+        
+        header = self._table_view.horizontalHeader()
+        
+        # Önce tüm sütunları içeriğe göre boyutlandır
+        for col in range(self._model.columnCount()):
+            self._table_view.resizeColumnToContents(col)
+        
+        # Ekran çözünürlüğüne göre azami genişlik sınırı hesapla
+        max_width = ScreenUtils.calculate_max_column_width()
+        
+        for col in range(self._model.columnCount()):
+            current_width = header.sectionSize(col)
+            # Azami genişlik kontrolü
+            if current_width > max_width:
+                header.resizeSection(col, max_width)
 
     def _on_save_clicked(self):
         """Kaydet butonuna tıklandığında"""

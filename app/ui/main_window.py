@@ -20,7 +20,7 @@ from PyQt6.QtWidgets import (
     QApplication,
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QSettings, QTimer
-from PyQt6.QtGui import QAction, QScreen
+from PyQt6.QtGui import QAction
 from pathlib import Path
 from typing import Optional, List
 
@@ -36,6 +36,7 @@ from app.ui.column_info_widget import ColumnInfoWidget, ColumnInfoDialog
 from app.ui.filter_widget import FilterWidget, FilterDialog
 from app.ui.icon_factory import IconFactory
 from app.ui.data_table_widget import DataTableWidget
+from app.ui.screen_utils import ScreenUtils
 
 # Uygulama ayarları için sabitler
 APP_NAME = "IKFiltresi"
@@ -194,48 +195,17 @@ class MainWindow(QMainWindow):
         Ekran çözünürlüğüne göre pencere boyutlarını dinamik olarak ayarlar.
         Çoklu monitör desteği ile o an bulunulan monitöre göre boyutlandırır.
         """
-        # Mevcut ekranı al (çoklu monitör desteği)
-        screen = self._get_current_screen()
-        screen_geometry = screen.availableGeometry()
-
-        screen_width = screen_geometry.width()
-        screen_height = screen_geometry.height()
-
         # Minimum boyutları ekran çözünürlüğüne orantılı hesapla
-        # Minimum boyut: ekranın %50'si genişlik, %50'si yükseklik
-        min_width = int(screen_width * 0.5)
-        min_height = int(screen_height * 0.5)
-
-        # Makul minimum sınırlar (çok küçük ekranlar için)
-        min_width = max(min_width, 800)
-        min_height = max(min_height, 600)
-
+        min_width, min_height = ScreenUtils.calculate_minimum_size()
         self.setMinimumSize(min_width, min_height)
 
-        # Başlangıç boyutu: ekranın %75'i genişlik, %80'i yükseklik
-        initial_width = int(screen_width * 0.75)
-        initial_height = int(screen_height * 0.80)
-
+        # Başlangıç boyutu
+        initial_width, initial_height = ScreenUtils.calculate_window_size()
         self.resize(initial_width, initial_height)
 
         # Pencereyi ekranın ortasına konumlandır
+        screen_geometry = ScreenUtils.get_screen_geometry()
         self._center_on_screen(screen_geometry)
-
-    def _get_current_screen(self) -> QScreen:
-        """
-        Mevcut/birincil ekranı döndürür.
-        Çoklu monitör durumunda fare imlecinin bulunduğu ekranı tercih eder.
-        """
-        # Fare imlecinin bulunduğu ekranı bul
-        cursor_pos = QApplication.instance().primaryScreen().geometry().center()
-
-        # Tüm ekranları kontrol et
-        for screen in QApplication.screens():
-            if screen.geometry().contains(cursor_pos):
-                return screen
-
-        # Varsayılan olarak birincil ekranı döndür
-        return QApplication.primaryScreen()
 
     def _center_on_screen(self, screen_geometry):
         """Pencereyi verilen ekran geometrisinin ortasına konumlandırır"""
