@@ -194,7 +194,7 @@ class FilterEngine:
             )
         except re.error:
             # Geçersiz regex durumunda boş mask döndür
-            return pd.Series([False] * len(df))
+            return pd.Series([False] * len(df), index=df.index)
 
     def _apply_not_matches(self, df: pd.DataFrame, f: FilterModel) -> pd.Series:
         return ~self._apply_matches(df, f)

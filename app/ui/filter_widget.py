@@ -29,6 +29,7 @@ from PyQt6.QtGui import QIcon, QPixmap
 from pathlib import Path
 from app.ui.icon_factory import IconFactory
 from typing import List, Optional, Any
+from dataclasses import dataclass
 from datetime import datetime
 
 from app.models.column_info import ColumnInfo, ColumnType
@@ -337,6 +338,14 @@ class TextInput(FilterValueInput):
         return self.edit.text()
 
 
+@dataclass
+class ChildContainer:
+    """FilterGroupWidget içinde çocuk widget ve operatör satırı ilişkisini tutar."""
+
+    widget: QWidget
+    operator_row: Optional[QWidget]
+
+
 class SingleFilterWidget(QFrame):
     """
     Tek bir filtre satırı widget'ı.
@@ -351,6 +360,7 @@ class SingleFilterWidget(QFrame):
         self.setObjectName("filterFrame")
         self._column_infos = column_infos
         self._current_column_info: Optional[ColumnInfo] = None
+        self._current_input: Optional[FilterValueInput] = None
         self._setup_ui()
 
     def _setup_ui(self):
@@ -638,7 +648,7 @@ class FilterGroupWidget(QFrame):
         self._column_infos = column_infos
         self._depth = depth
         self._parent_widget = parent_widget
-        self._children: List[QWidget] = []  # SingleFilterWidget veya FilterGroupWidget
+        self._children: List["ChildContainer"] = []
         self._operator_combos: List[QComboBox] = (
             []
         )  # Her çocuk için önceki operatör (ilk hariç)
@@ -763,6 +773,37 @@ class FilterGroupWidget(QFrame):
         row.operator_combo = combo
         return row
 
+    def _create_operator_row_with_value(
+        self, operator: LogicalOperator
+    ) -> Optional[QWidget]:
+        """Operatör satırı oluşturur ve verilen operatöre göre combo değerini ayarlar."""
+        operator_row = self._create_operator_row()
+        for j in range(operator_row.operator_combo.count()):
+            if operator_row.operator_combo.itemData(j) == operator:
+                operator_row.operator_combo.setCurrentIndex(j)
+                break
+        return operator_row
+
+    def _append_child(
+        self, child_widget: QWidget, operator: Optional[LogicalOperator] = None
+    ) -> Optional[QWidget]:
+        """Çocuk widget'ı ve gerekirse operatör satırını ekler."""
+        operator_row = None
+        if self._children:
+            op = operator or LogicalOperator.AND
+            operator_row = self._create_operator_row_with_value(op)
+            self._operator_combos.append(operator_row.operator_combo)
+            self._children_layout.insertWidget(
+                self._children_layout.count() - 1, operator_row
+            )
+
+        container = ChildContainer(widget=child_widget, operator_row=operator_row)
+        self._children.append(container)
+        self._children_layout.insertWidget(
+            self._children_layout.count() - 1, child_widget
+        )
+        return operator_row
+
     def _on_operator_changed(self, index: int):
         """Operatör değiştiğinde"""
         self.changed.emit()
@@ -772,31 +813,11 @@ class FilterGroupWidget(QFrame):
         if not self._column_infos:
             return
 
-        # İlk eleman değilse önce operatör satırı ekle
-        operator_row = None
-        if self._children:
-            operator_row = self._create_operator_row()
-            self._operator_combos.append(operator_row.operator_combo)
-            self._children_layout.insertWidget(
-                self._children_layout.count() - 1, operator_row
-            )
-
         # Filtre widget'ı
         filter_widget = SingleFilterWidget(self._column_infos)
-        filter_widget.removed.connect(
-            lambda w: self._remove_child(filter_widget, operator_row)
-        )
+        self._append_child(filter_widget, LogicalOperator.AND)
+        filter_widget.removed.connect(lambda w: self._remove_child(filter_widget))
         filter_widget.changed.connect(self._on_child_changed)
-
-        # Container tuple olarak sakla (widget, operator_row)
-        container = QWidget()
-        container.filter_widget = filter_widget
-        container.operator_row = operator_row
-
-        self._children.append(container)
-        self._children_layout.insertWidget(
-            self._children_layout.count() - 1, filter_widget
-        )
         self.changed.emit()
 
     def _add_group(self):
@@ -804,42 +825,22 @@ class FilterGroupWidget(QFrame):
         if not self._column_infos:
             return
 
-        # İlk eleman değilse önce operatör satırı ekle
-        operator_row = None
-        if self._children:
-            operator_row = self._create_operator_row()
-            self._operator_combos.append(operator_row.operator_combo)
-            self._children_layout.insertWidget(
-                self._children_layout.count() - 1, operator_row
-            )
-
         # Grup widget'ı
         group_widget = FilterGroupWidget(
             self._column_infos, depth=self._depth + 1, parent_widget=self
         )
-        group_widget.removed.connect(
-            lambda w: self._remove_child(group_widget, operator_row)
-        )
+        self._append_child(group_widget, LogicalOperator.AND)
+        group_widget.removed.connect(lambda w: self._remove_child(group_widget))
         group_widget.changed.connect(self._on_child_changed)
-
-        # Container tuple olarak sakla
-        container = QWidget()
-        container.filter_widget = group_widget
-        container.operator_row = operator_row
-
-        self._children.append(container)
-        self._children_layout.insertWidget(
-            self._children_layout.count() - 1, group_widget
-        )
         self.changed.emit()
 
-    def _remove_child(self, widget: QWidget, operator_row: Optional[QWidget]):
+    def _remove_child(self, widget: QWidget):
         """Çocuk elemanı kaldırır"""
         # Container'ı bul
         container_to_remove = None
         idx = -1
         for i, container in enumerate(self._children):
-            if container.filter_widget == widget:
+            if container.widget == widget:
                 container_to_remove = container
                 idx = i
                 break
@@ -850,6 +851,7 @@ class FilterGroupWidget(QFrame):
         self._children.remove(container_to_remove)
 
         # Operatör satırını kaldır
+        operator_row = container_to_remove.operator_row
         if operator_row:
             if operator_row.operator_combo in self._operator_combos:
                 self._operator_combos.remove(operator_row.operator_combo)
@@ -897,10 +899,10 @@ class FilterGroupWidget(QFrame):
         Bu widget'tan FilterGroup modeli oluşturur.
         Rekürsif olarak tüm çocukları toplar.
         """
-        group = FilterGroup(id=self._group_id or "")
+        group = FilterGroup(id=self._group_id) if self._group_id else FilterGroup()
 
         for i, container in enumerate(self._children):
-            child_widget = container.filter_widget
+            child_widget = container.widget
 
             # Operatörü al (ilk eleman hariç)
             operator = LogicalOperator.AND
@@ -936,67 +938,19 @@ class FilterGroupWidget(QFrame):
             operator = item.preceding_operator or LogicalOperator.AND
 
             if isinstance(child, FilterModel):
-                # İlk eleman değilse operatör satırı ekle
-                operator_row = None
-                if self._children:
-                    operator_row = self._create_operator_row()
-                    # Operatörü ayarla
-                    for j in range(operator_row.operator_combo.count()):
-                        if operator_row.operator_combo.itemData(j) == operator:
-                            operator_row.operator_combo.setCurrentIndex(j)
-                            break
-                    self._operator_combos.append(operator_row.operator_combo)
-                    self._children_layout.insertWidget(
-                        self._children_layout.count() - 1, operator_row
-                    )
-
                 filter_widget = SingleFilterWidget(self._column_infos)
-                filter_widget.removed.connect(
-                    lambda w, op_row=operator_row: self._remove_child(w, op_row)
-                )
+                self._append_child(filter_widget, operator)
+                filter_widget.removed.connect(lambda w: self._remove_child(w))
                 filter_widget.changed.connect(self._on_child_changed)
-
-                container = QWidget()
-                container.filter_widget = filter_widget
-                container.operator_row = operator_row
-
-                self._children.append(container)
-                self._children_layout.insertWidget(
-                    self._children_layout.count() - 1, filter_widget
-                )
                 filter_widget.apply_filter_model(child)
 
             elif isinstance(child, FilterGroup):
-                # İlk eleman değilse operatör satırı ekle
-                operator_row = None
-                if self._children:
-                    operator_row = self._create_operator_row()
-                    # Operatörü ayarla
-                    for j in range(operator_row.operator_combo.count()):
-                        if operator_row.operator_combo.itemData(j) == operator:
-                            operator_row.operator_combo.setCurrentIndex(j)
-                            break
-                    self._operator_combos.append(operator_row.operator_combo)
-                    self._children_layout.insertWidget(
-                        self._children_layout.count() - 1, operator_row
-                    )
-
                 group_widget = FilterGroupWidget(
                     self._column_infos, depth=self._depth + 1, parent_widget=self
                 )
-                group_widget.removed.connect(
-                    lambda w, op_row=operator_row: self._remove_child(w, op_row)
-                )
+                self._append_child(group_widget, operator)
+                group_widget.removed.connect(lambda w: self._remove_child(w))
                 group_widget.changed.connect(self._on_child_changed)
-
-                container = QWidget()
-                container.filter_widget = group_widget
-                container.operator_row = operator_row
-
-                self._children.append(container)
-                self._children_layout.insertWidget(
-                    self._children_layout.count() - 1, group_widget
-                )
                 group_widget.apply_filter_group(child)
 
     def get_display_string(self) -> str:
@@ -1172,7 +1126,11 @@ class FilterDialog(QDialog):
         )
         if not path:
             return
-
+        suffix = ".json"
+        # Uzantı yoksa veya farklıysa .json ekle
+        path_obj = Path(path)
+        if path_obj.suffix.lower() != suffix:
+            path = str(path_obj.with_suffix(suffix))
         try:
             persistence = FilterPersistence(path=path)
             group = (
